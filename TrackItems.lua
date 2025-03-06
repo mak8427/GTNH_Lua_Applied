@@ -4,6 +4,7 @@ local me
 
 if component.isAvailable("me_controller") then
     me = component.me_controller
+    print(me)
     elseif component.isAvailable("me_interface") then
         me = component.me_interface
         else
