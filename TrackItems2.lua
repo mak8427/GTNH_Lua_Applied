@@ -58,6 +58,7 @@ function AE_get_items(datetime)
 		count = count + 1
             end
         end
+        print(string)
         return string
     end
 end
@@ -67,7 +68,6 @@ function sleep(n)
 end
 
 
-i = 1
 check_time = 1
 
 datetime = webclock()
@@ -98,4 +98,4 @@ repeat
 
 	check_time = check_time + 1
 
-until i > 5
+until 1 > 5
