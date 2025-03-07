@@ -51,7 +51,6 @@ function AE_get_items(datetime)
 		        print("Printing Item:" .. item)
             end
         end
-        print(string)
         return string
     else
         for k,v in pairs(me.getItemsInNetwork()) do
@@ -86,9 +85,10 @@ repeat
 	local file = io.open("Items.txt", "a")
 
 	local items = AE_get_items(datetime)
+    print("items".. items)
 
 	file:write(items)
-
+    file:flush()
 	file:close()
 
 	print("Getting Items! "..time_format(datetime))
