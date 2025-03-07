@@ -71,6 +71,7 @@ end
 check_time = 1
 
 datetime = webclock()
+local file = io.open("Items.txt", "a")
 
 repeat
 
@@ -81,7 +82,7 @@ repeat
 		check_time = 1
 	end
 
-	local file = io.open("Items.txt", "a")
+
 
 	local items = AE_get_items(datetime)
     print("items".. items)
@@ -89,7 +90,7 @@ repeat
 	file:write(items)
     file:flush()
 
-	file:close()
+
 
 	print("Getting Items! "..time_format(datetime))
 
@@ -101,3 +102,4 @@ repeat
 	check_time = check_time + 1
 
 until 1 > 5
+file:close()
