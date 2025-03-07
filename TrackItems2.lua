@@ -43,7 +43,7 @@ function AE_get_items(datetime)
 
     local count = 1
 
-    if isModpackGTNH then
+    if not isModpackGTNH then
         for item in storedItems do
             if type(item) == 'table' then
                 string = string .. "," .. '{"item":"' .. item['label'] .. '","quantity":"' .. item["size"] .. '","datetime":"'.. time_format .. '"}' .. "\n"
@@ -88,6 +88,7 @@ repeat
 
 	file:write(items)
     file:flush()
+
 	file:close()
 
 	print("Getting Items! "..time_format(datetime))
