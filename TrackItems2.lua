@@ -50,6 +50,7 @@ function AE_get_items(datetime)
 		        count = count + 1
             end
         end
+        print(string)
         return string
     else
         for k,v in pairs(me.getItemsInNetwork()) do
@@ -58,7 +59,7 @@ function AE_get_items(datetime)
 		count = count + 1
             end
         end
-        print(string)
+
         return string
     end
 end
