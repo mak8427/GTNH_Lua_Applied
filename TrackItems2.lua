@@ -54,7 +54,7 @@ function AE_get_items(datetime)
     else
         for k,v in pairs(me.getItemsInNetwork()) do
             if type(v) == 'table' then
-		        string = string .. "," .. '{"item":"' .. v['label'] .. '","quantity":"' .. v["size"] .. '","datetime":"'.. time_format .. '"}' .. "\n"
+		        string = string  .. v['label'] .. ',' .. v["size"] .. ','.. time_format .. "\n"
 		        count = count + 1
             end
         end
@@ -71,7 +71,7 @@ end
 check_time = 1
 
 datetime = webclock()
-local file = io.open("Export.txt", "a")
+local file = io.open("Export.csv", "a")
 
 repeat
 
