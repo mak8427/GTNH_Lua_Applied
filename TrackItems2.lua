@@ -15,7 +15,7 @@ end
 -- Function to get Real World time
 function webclock()
 
-	local handle = internet.request("http://www.rootdir.org/webclock.php?tz=Rome/Bahia&locale=pt_BR.UTF-8")
+	local handle = internet.request("http://www.rootdir.org/webclock.php?tz=Europe/Rome&locale=pt_BR.UTF-8")
 	local result = ""
 
 	for chunk in handle do result = chunk end
