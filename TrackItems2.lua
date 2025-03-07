@@ -54,8 +54,10 @@ function AE_get_items(datetime)
     else
         for k,v in pairs(me.getItemsInNetwork()) do
             if type(v) == 'table' then
-		        string = string  .. v['label'] .. ',' .. v["size"] .. ','.. time_format .. "\n"
-		        count = count + 1
+               if v["size"] > 100 then
+		            string = string  .. v['label'] .. ',' .. v["size"] .. ','.. time_format .. "\n"
+		            count = count + 1
+		       end
             end
         end
         print("Items Crawled: " .. count)
