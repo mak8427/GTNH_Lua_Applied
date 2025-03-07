@@ -58,7 +58,7 @@ function AE_get_items(datetime)
 		        count = count + 1
             end
         end
-
+        print("Items Crawled: " .. count)
         return string
     end
 end
@@ -85,7 +85,6 @@ repeat
 
 
 	local items = AE_get_items(datetime)
-    print("items".. items)
 
 	file:write(items)
     file:flush()
@@ -95,9 +94,9 @@ repeat
 	print("Getting Items! "..time_format(datetime))
 
     -- Wait 15 minutes for another update
-	sleep(20)
+	sleep(60)
 
-	datetime = datetime + 20
+	datetime = datetime + 60
 
 	check_time = check_time + 1
 
