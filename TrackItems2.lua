@@ -71,7 +71,7 @@ end
 check_time = 1
 
 datetime = webclock()
-local file = io.open("Items.txt", "a")
+local file = io.open("Export.txt", "a")
 
 repeat
 
