@@ -94,9 +94,9 @@ repeat
 	print("Getting Items! "..time_format(datetime))
 
     -- Wait 15 minutes for another update
-	sleep(10)
+	sleep(20)
 
-	datetime = datetime + 10
+	datetime = datetime + 20
 
 	check_time = check_time + 1
 
