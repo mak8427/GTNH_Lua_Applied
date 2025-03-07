@@ -48,7 +48,6 @@ function AE_get_items(datetime)
             if type(item) == 'table' then
                 string = string .. "," .. '{"item":"' .. item['label'] .. '","quantity":"' .. item["size"] .. '","datetime":"'.. time_format .. '"}' .. "\n"
 		        count = count + 1
-		        print("Printing Item:" .. item)
             end
         end
         return string
