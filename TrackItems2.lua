@@ -54,8 +54,8 @@ function AE_get_items(datetime)
     else
         for k,v in pairs(me.getItemsInNetwork()) do
             if type(v) == 'table' then
-		        string = string .. "," .. '{"item":"' .. item['label'] .. '","quantity":"' .. item["size"] .. '","datetime":"'.. time_format .. '"}' .. "\n"
-		count = count + 1
+		        string = string .. "," .. '{"item":"' .. v['label'] .. '","quantity":"' .. v["size"] .. '","datetime":"'.. time_format .. '"}' .. "\n"
+		        count = count + 1
             end
         end
 
