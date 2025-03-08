@@ -53,7 +53,7 @@ function AE_get_items(datetime)
         return string
     else
         for k, v in pairs(me.getItemsInNetwork()) do
-            if type(v) == 'table' and v["size"] and v["size"] > 100 then
+            if type(v) == 'table' and v["size"] and v["size"] > 10 then
                 if v["label"] and string.find(v["label"], ",") then
                     v["label"] = string.gsub(v["label"], ",", "-")
                 end
