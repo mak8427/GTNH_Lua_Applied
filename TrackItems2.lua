@@ -36,7 +36,7 @@ end
 -- Function to get the items from AE2
 -- Got this function from PoroCoco: https://github.com/PoroCoco/myaenetwork/blob/main/web.lua
 function AE_get_items(datetime)
-    local string = ""
+    local raw = ""
     local isModpackGTNH, storedItems = pcall(me.allItems) --tries the allItems method only available on the GTNH modpack.
 
     local time_format = time_format(datetime)
@@ -52,18 +52,20 @@ function AE_get_items(datetime)
         end
         return string
     else
-        for k,v in pairs(me.getItemsInNetwork()) do
-            if type(v) == 'table' then
-               if v["size"] > 100 then
-		            string = string  .. v['label'] .. ',' .. v["size"] .. ','.. time_format .. "\n"
-		            count = count + 1
-		       end
+        for k, v in pairs(me.getItemsInNetwork()) do
+            if type(v) == 'table' and v["size"] and v["size"] > 100 then
+                if v["label"] and string.find(v["label"], ",") then
+                    v["label"] = string.gsub(v["label"], ",", "-")
+                end
+                raw = raw .. v["label"] .. ',' .. v["size"] .. ',' .. time_format .. "\n"
+                count = count + 1
             end
         end
+        end
         print("Items Crawled: " .. count)
-        return string
-    end
-end
+        return raw
+ end
+
 
 function sleep(n)
   os.execute("sleep " .. tonumber(n))
