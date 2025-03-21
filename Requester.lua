@@ -15,11 +15,6 @@ watchitems = {
 
 local component = require("component")
 
-print("[DEBUG] Listing all items in AE2 Network:")
-for _, item in ipairs(ae2.getItemsInNetwork()) do
-  print(string.format("%s/%d - %d in stock", item.name, item.damage, item.size))
-end
-
 print("[DEBUG] Checking AE2 component availability...")
 local ae2
 if component.isAvailable("me_controller") then
@@ -31,6 +26,11 @@ elseif component.isAvailable("me_interface") then
 else
     print("[ERROR] No ME controller or interface found. Exiting.")
     os.exit()
+end
+
+
+for _, item in ipairs(ae2.getItemsInNetwork()) do
+  print(string.format("%s/%d - %d in stock", item.name, item.damage, item.size))
 end
 
 -- Infinite loop
