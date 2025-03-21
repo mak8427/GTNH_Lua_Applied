@@ -10,7 +10,7 @@ os = require("os")
 -- List of items to watch
 watchitems = {
   ["minecraft:stone"] = 15000 ,
-  ["gregtech:gt.metaitem_01/11085"] = 50000
+  ["gregtech:gt.metaitem.01/11085"] = 50000
 }
 
 local component = require("component")
