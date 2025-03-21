@@ -5,8 +5,7 @@ string = require("string")
 os = require("os")
 
 -- Change to the address of your adapter and redstone io
-rs = component.proxy("b029eedf-5119-4aea-91d2-84e3c2e0e4e8")
-ae2 = component.proxy("c2696567-82f6-4c15-80de-b78e275f47c1")
+-- rs = component.proxy("b029eedf-5119-4aea-91d2-84e3c2e0e4e8")
 
 
 -- List of items to watch. Enable advanced tooltips to get the itemnames (F3+H)
@@ -18,6 +17,19 @@ watchitems = {
 }
 
 
+local component = require("component")
+
+
+local ae2
+if component.isAvailable("me_controller") then
+    ae2 = component.me_controller
+elseif component.isAvailable("me_interface") then
+    ae2 = component.me_interface
+else
+    print("You need to connect the adapter to either a me controller or a me interface")
+    os.exit()
+end
+
 -- Infinite loop, can use alt-ctrl-c to break
 while true do
 
@@ -26,6 +38,7 @@ while true do
 
   -- Check if any CPU's are currently being used.
   cpus = ae2.getCpus()
+
   busy = false
   for i in ipairs(cpus) do busy = cpus[i].busy or busy end
 
