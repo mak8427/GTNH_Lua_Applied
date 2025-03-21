@@ -29,7 +29,10 @@ end
 -- List of items to watch
 watchitems = {
     ["minecraft:stone"] = 15000,
-    ["gregtech:gt.metaitem.01/11085"] = 30000
+    ["gregtech:gt.metaitem.01/11085"] = 30000,
+    ["gregtech:gt.metaitem.01/11317"] = 300,
+    ["gregtech:gt.metaitem.01/2084"] = 3000
+
 }
 
 
