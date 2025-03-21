@@ -38,11 +38,17 @@ while true do
   -- Check if any CPUs are busy
   print("[DEBUG] Fetching AE2 CPU usage...")
   cpus = ae2.getCpus()
-  busy = false
+
+
+  busy = true
   for i in ipairs(cpus) do
     print(string.format("[DEBUG] CPU %d busy: %s", i, tostring(cpus[i].busy)))
-    busy = cpus[i].busy or busy
+    if cpus[i].busy == false then
+      busy = false
+      break
+    end
   end
+
 
   if rs_input > 0 and busy == false then
     print("[DEBUG] System is idle and ready for crafting check.")
