@@ -3,15 +3,35 @@ sides = require("sides")
 component = require("component")
 string = require("string")
 os = require("os")
+internet = require("internet")  -- Added for webclock functions
 
--- Change to the address of your adapter and redstone io
--- rs = component.proxy("b029eedf-5119-4aea-91d2-84e3c2e0e4e8")
+-- Function to get Real World time
+function webclock()
+  local handle = internet.request("http://www.rootdir.org/webclock.php?tz=Europe/Rome&locale=pt_BR.UTF-8")
+  local result = ""
+  for chunk in handle do
+    result = chunk
+  end
+  local datetime = os.time({
+    year = result:sub(1,4),
+    month = result:sub(6,7),
+    day = result:sub(9,10),
+    hour = result:sub(12,13),
+    min = result:sub(15,16),
+    sec = result:sub(18,19)
+  })
+  return datetime
+end
 
+function time_format(datetime)
+  return os.date("%Y-%m-%d %H:%M:%S", datetime)
+end
 -- List of items to watch
 watchitems = {
     ["minecraft:stone"] = 15000,
     ["gregtech:gt.metaitem.01/11085"] = 30000
 }
+
 
 
 
@@ -86,19 +106,20 @@ while true do
     if rs_input > 0 and busy == false then
         print("[DEBUG] System is idle and ready for crafting check.")
 
-        local monitors = {}  -- Table to store crafting monitors
+        local monitors = {}  -- Table to store crafting monitors along with debug info
 
         -- Request crafting for each item if stock is low
-        for itemname, keepsize in pairs(watchitems) do
+        for fullItemName, keepsize in pairs(watchitems) do
             print("\n----------------------------------------")
-            print(string.format("[DEBUG] Checking item: %s | Desired count: %d", itemname, keepsize))
+            print(string.format("[DEBUG] Checking item: %s | Desired count: %d", fullItemName, keepsize))
 
             local damage = 0
-            if string.find(itemname, "/") ~= nil then
-                local delim = string.find(itemname, "/")
-                local len = string.len(itemname)
-                damage = string.sub(itemname, delim + 1, len)
-                itemname = string.sub(itemname, 1, delim - 1)
+            local itemname = fullItemName
+            if string.find(fullItemName, "/") ~= nil then
+                local delim = string.find(fullItemName, "/")
+                local len = string.len(fullItemName)
+                damage = string.sub(fullItemName, delim + 1, len)
+                itemname = string.sub(fullItemName, 1, delim - 1)
                 print(string.format("[DEBUG] Parsed item: %s | Metadata: %s", itemname, damage))
             else
                 print("[DEBUG] No metadata found; using 0")
@@ -127,7 +148,16 @@ while true do
                 else
                     print(string.format("[DEBUG] Requesting crafting of %d of %s/%s...", reqsize, itemname, damage))
                     local monitor = recipe.request(reqsize)
-                    monitors[itemname] = monitor  -- Store monitor for later concurrent checking
+                    -- Store monitor along with start time (using webclock), requested quantity, initial stock, and query info
+                    monitors[fullItemName] = {
+                        monitor = monitor,
+                        startTime = webclock(),
+                        totalRequested = reqsize,
+                        initialStock = stocksize,
+                        queryName = itemname,
+                        queryDamage = tonumber(damage)
+                    }
+                    print(string.format("[DEBUG] Craft initiated at %s", time_format(monitors[fullItemName].startTime)))
                 end
             else
                 print(string.format("[DEBUG] Stock sufficient: %d / %d", stocksize, keepsize))
@@ -144,16 +174,35 @@ while true do
         end
 
         while next(unfinished) do
-            for item, monitor in pairs(monitors) do
-                if unfinished[item] then
+            for itemKey, data in pairs(monitors) do
+                local monitor = data.monitor
+                local startTime = data.startTime
+                local totalRequested = data.totalRequested
+                local initialStock = data.initialStock
+                local elapsed = webclock() - startTime
+
+                -- Re-query the current stock for this item using the stored query info
+                local currentItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
+                local currentStock = 0
+                if currentItem ~= nil then
+                    currentStock = currentItem.size
+                end
+
+                local produced = currentStock - initialStock
+                if produced < 0 then produced = 0 end
+                local remaining = totalRequested - produced
+                if remaining < 0 then remaining = 0 end
+
+                if unfinished[itemKey] then
                     if monitor.isCanceled() then
-                        print(string.format("[WARNING] Crafting of %s was canceled.", item))
-                        unfinished[item] = nil
+                        print(string.format("[WARNING] Crafting of %s was canceled after %d seconds.", itemKey, elapsed))
+                        unfinished[itemKey] = nil
                     elseif monitor.isDone() then
-                        print(string.format("[DEBUG] Crafting of %s completed successfully!", item))
-                        unfinished[item] = nil
+                        print(string.format("[DEBUG] Crafting of %s completed successfully after %d seconds!", itemKey, elapsed))
+                        unfinished[itemKey] = nil
                     else
-                        print(string.format("[DEBUG] Crafting in progress for %s...", item))
+                        print(string.format("[DEBUG] Crafting in progress for %s... Started at %s, Elapsed: %d seconds, Produced: %d, Remaining: %d",
+                            itemKey, time_format(startTime), elapsed, produced, remaining))
                     end
                 end
             end
