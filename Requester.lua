@@ -22,7 +22,7 @@ watchitems = {
 while true do
 
   -- Check to see if we're getting redstone input from the top.
-  rs_input = rs.getInput(sides.top)
+  rs_input = 100
 
   -- Check if any CPU's are currently being used.
   cpus = ae2.getCpus()
