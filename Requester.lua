@@ -29,9 +29,36 @@ else
 end
 
 
-for _, item in ipairs(ae2.getItemsInNetwork()) do
-  print(string.format("%s/%d - %d in stock", item.name, item.damage, item.size))
+local logFile = "ae2_item_log.txt"  -- Change path if needed
+
+-- Open file for writing
+local file = io.open(logFile, "w")
+if not file then
+  print("[ERROR] Failed to open log file for writing.")
+  return
 end
+
+print("[DEBUG] Listing all items in AE2 Network... Writing to log.")
+
+file:write("AE2 Network Item List:\n")
+file:write("---------------------------------\n")
+
+local items = ae2.getItemsInNetwork()
+
+if #items == 0 then
+  file:write("[ERROR] No items found in AE2 Network.\n")
+  print("[ERROR] No items found in AE2 Network.")
+else
+  for _, item in ipairs(items) do
+    local line = string.format("%s/%d - %d in stock\n", item.name, item.damage, item.size)
+    file:write(line)
+  end
+end
+
+file:write("---------------------------------\n")
+file:close()
+
+print("[DEBUG] Item list saved to " .. logFile)
 
 -- Infinite loop
 while true do
