@@ -27,16 +27,33 @@ function time_format(datetime)
     return os.date("%Y-%m-%d %H:%M:%S", datetime)
 end
 
--- List of items to watch (desired stock values)
-watchitems = {
-    ["minecraft:stone"] = 15000,
-    ["gregtech:gt.metaitem.01/11085"] = 30000,
-    ["gregtech:gt.metaitem.01/11317"] = 300,
-    ["gregtech:gt.metaitem.01/2084"] = 3000
-}
+---------------------------------------------------------------------
+-- CSV Watchlist
+-- Format: itemID,desired stock,batch size
+local watchitems_csv = [[
+minecraft:stone,15000,64
+gregtech:gt.metaitem.01/11085,40000,400
+gregtech:gt.metaitem.01/11317,400,200
+gregtech:gt.metaitem.01/2084,4000,128
+]]
 
-local component = require("component")
+-- Parse CSV text into a table.
+-- The resulting table will have keys as item IDs and values as { desired = number, batch = number }
+local function parseWatchItems(csv)
+    local items = {}
+    for line in csv:gmatch("[^\r\n]+") do
+        local id, desired, batch = line:match("([^,]+),([^,]+),([^,]+)")
+        if id and desired and batch then
+            items[id] = { desired = tonumber(desired), batch = tonumber(batch) }
+        end
+    end
+    return items
+end
 
+local watchitems = parseWatchItems(watchitems_csv)
+---------------------------------------------------------------------
+
+-- Get AE2 component
 print("[DEBUG] Checking AE2 component availability...")
 local ae2
 if component.isAvailable("me_controller") then
@@ -91,12 +108,15 @@ local function parseItemName(fullName)
 end
 
 -- Function to trigger crafting requests for items that are short in stock.
--- Returns a table with monitor records.
+-- Only one active request per item is allowed.
 local function checkCrafting(freeCPU)
     local monitors = {}
-    for fullItemName, desiredCount in pairs(watchitems) do
+    for fullItemName, data in pairs(watchitems) do
+        local desiredCount = data.desired
+        local batchSize = data.batch
         print("\n----------------------------------------")
-        print(string.format("[DEBUG] Checking item: %s | Desired count: %d", fullItemName, desiredCount))
+        print(string.format("[DEBUG] Checking item: %s | Desired count: %d | Batch size: %d", fullItemName, desiredCount,
+            batchSize))
 
         local itemname, damage = parseItemName(fullItemName)
         print(string.format("[DEBUG] Parsed item: %s | Metadata: %s", itemname, tostring(damage)))
@@ -117,11 +137,13 @@ local function checkCrafting(freeCPU)
         end
 
         if desiredCount > currentStock then
-            local reqsize = desiredCount - currentStock
-            print(string.format("[DEBUG] Need to craft %d more of %s/%s", reqsize, itemname, tostring(damage)))
+            local difference = desiredCount - currentStock
+            local reqsize = math.min(difference, batchSize)
+            print(string.format("[DEBUG] Need to craft %d more (difference: %d) of %s (Label: %s)", reqsize, difference,
+                itemname, label))
             local recipe = ae2.getCraftables({ name = itemname, damage = damage })[1]
             if recipe then
-                print(string.format("[DEBUG] Requesting crafting of %d of %s/%s...", reqsize, itemname, tostring(damage)))
+                print(string.format("[DEBUG] Requesting crafting of %d of %s (Label: %s)...", reqsize, itemname, label))
                 local monitor = recipe.request(reqsize)
                 monitors[fullItemName] = {
                     monitor = monitor,
@@ -133,8 +155,8 @@ local function checkCrafting(freeCPU)
                     label = label,
                     cpuNum = freeCPU
                 }
-                print(string.format("[DEBUG] Craft initiated at %s on CPU %s",
-                    time_format(monitors[fullItemName].startTime), tostring(freeCPU)))
+                print(string.format("[DEBUG] Craft initiated at %s on CPU %s for %s",
+                    time_format(monitors[fullItemName].startTime), tostring(freeCPU), label))
             else
                 print(string.format("[ERROR] No recipe found for %s/%s", itemname, tostring(damage)))
             end
@@ -148,7 +170,6 @@ local function checkCrafting(freeCPU)
 end
 
 -- Function to monitor crafting requests concurrently.
--- This function will only monitor the current active requests.
 local function monitorCrafting(monitors)
     local unfinished = {}
     for key, _ in pairs(monitors) do
@@ -174,17 +195,18 @@ local function monitorCrafting(monitors)
             if unfinished[itemKey] then
                 if monitor.isCanceled() then
                     print(string.format("[WARNING] Crafting of %s (Label: %s, CPU: %s) was canceled after %d seconds.",
-                        itemKey, data.label, tostring(data.cpuNum), elapsed))
+                        data.label, data.label, tostring(data.cpuNum), elapsed))
                     unfinished[itemKey] = nil
                 elseif monitor.isDone() then
                     print(string.format(
                         "[DEBUG] Crafting of %s (Label: %s, CPU: %s) completed successfully after %d seconds! Produced: %d, Remaining: %d",
-                        itemKey, data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+                        data.label, data.label, tostring(data.cpuNum), elapsed, produced, remaining))
                     unfinished[itemKey] = nil
                 else
                     print(string.format(
                         "[DEBUG] Crafting in progress for %s (Label: %s, CPU: %s)... Started at %s, Elapsed: %d seconds, Produced: %d, Remaining: %d",
-                        itemKey, data.label, tostring(data.cpuNum), time_format(startTime), elapsed, produced, remaining))
+                        data.label, data.label, tostring(data.cpuNum), time_format(startTime), elapsed, produced,
+                        remaining))
                 end
             end
         end
