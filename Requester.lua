@@ -93,15 +93,16 @@ while true do
     rs_input = 100
     print(string.format("[DEBUG] Redstone input is %d", rs_input))
 
-    -- Check if any CPUs are busy
+    -- Check if any CPUs are busy and record the first free CPU number
     print("[DEBUG] Fetching AE2 CPU usage...")
     cpus = ae2.getCpus()
-
-    busy = true
-    for i in ipairs(cpus) do
-        print(string.format("[DEBUG] CPU %d busy: %s", i, tostring(cpus[i].busy)))
-        if cpus[i].busy == false then
+    local busy = true
+    local freeCPU = "N/A"
+    for i, cpu in ipairs(cpus) do
+        print(string.format("[DEBUG] CPU %d busy: %s", i, tostring(cpu.busy)))
+        if not cpu.busy then
             busy = false
+            freeCPU = i
             break
         end
     end
@@ -132,12 +133,16 @@ while true do
             local item_in_network = ae2.getItemsInNetwork({ name = itemname, damage = tonumber(damage) })[1]
 
             local stocksize = 0
+            local label = fullItemName
             if item_in_network == nil then
                 print("[DEBUG] Item not found in network. Assuming 0 in stock.")
                 stocksize = 0
             else
                 stocksize = item_in_network.size
-                print(string.format("[DEBUG] Current stock: %d", stocksize))
+                if item_in_network.label then
+                    label = item_in_network.label
+                end
+                print(string.format("[DEBUG] Current stock: %d (Label: %s)", stocksize, label))
             end
 
             if keepsize > stocksize then
@@ -151,16 +156,18 @@ while true do
                 else
                     print(string.format("[DEBUG] Requesting crafting of %d of %s/%s...", reqsize, itemname, damage))
                     local monitor = recipe.request(reqsize)
-                    -- Store monitor along with start time (using webclock), requested quantity, initial stock, and query info
+                    -- Store monitor along with start time (using webclock), requested quantity, initial stock, query info, label, and CPU number.
                     monitors[fullItemName] = {
                         monitor = monitor,
                         startTime = webclock(),
                         totalRequested = reqsize,
                         initialStock = stocksize,
                         queryName = itemname,
-                        queryDamage = tonumber(damage)
+                        queryDamage = tonumber(damage),
+                        label = label,
+                        cpuNum = freeCPU
                     }
-                    print(string.format("[DEBUG] Craft initiated at %s", time_format(monitors[fullItemName].startTime)))
+                    print(string.format("[DEBUG] Craft initiated at %s on CPU %s", time_format(monitors[fullItemName].startTime), tostring(freeCPU)))
                 end
             else
                 print(string.format("[DEBUG] Stock sufficient: %d / %d", stocksize, keepsize))
@@ -198,14 +205,14 @@ while true do
 
                 if unfinished[itemKey] then
                     if monitor.isCanceled() then
-                        print(string.format("[WARNING] Crafting of %s was canceled after %d seconds.", itemKey, elapsed))
+                        print(string.format("[WARNING] Crafting of %s (Label: %s, CPU: %s) was canceled after %d seconds.", itemKey, data.label, tostring(data.cpuNum), elapsed))
                         unfinished[itemKey] = nil
                     elseif monitor.isDone() then
-                        print(string.format("[DEBUG] Crafting of %s completed successfully after %d seconds!", itemKey, elapsed))
+                        print(string.format("[DEBUG] Crafting of %s (Label: %s, CPU: %s) completed successfully after %d seconds!", itemKey, data.label, tostring(data.cpuNum), elapsed))
                         unfinished[itemKey] = nil
                     else
-                        print(string.format("[DEBUG] Crafting in progress for %s... Started at %s, Elapsed: %d seconds, Produced: %d, Remaining: %d",
-                            itemKey, time_format(startTime), elapsed, produced, remaining))
+                        print(string.format("[DEBUG] Crafting in progress for %s (Label: %s, CPU: %s)... Started at %s, Elapsed: %d seconds, Produced: %d, Remaining: %d",
+                            itemKey, data.label, tostring(data.cpuNum), time_format(startTime), elapsed, produced, remaining))
                     end
                 end
             end
