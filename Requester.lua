@@ -178,7 +178,7 @@ local function checkCrafting()
       print(string.format("[DEBUG] Stock sufficient: %d / %d", currentStock, desiredCount))
     end
 
-    os.sleep(2)  -- Short delay between requests
+    os.sleep(0.5)  -- Short delay between requests
   end
   return monitors
 end
@@ -208,16 +208,16 @@ local function monitorCrafting(monitors)
 
       if unfinished[itemKey] then
         if monitor.isCanceled() then
-          print(string.format("[WARNING] Crafting of %s (Label: %s, CPU: %s) was canceled after %d seconds.",
-                data.label, data.label, tostring(data.cpuNum), elapsed))
+          print(string.format("[WARNING] Crafting of %s CPU: %s was canceled after %d seconds.",
+                data.label, tostring(data.cpuNum), elapsed))
           unfinished[itemKey] = nil
         elseif monitor.isDone() then
-          print(string.format("[DEBUG] Crafting of %s (Label: %s, CPU: %s) completed successfully after %d seconds! Produced: %d, Remaining: %d",
-                data.label, data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+          print(string.format("[DEBUG] Crafting of %s  CPU: %s completed successfully after %d seconds! Produced: %d, Remaining: %d",
+                data.label,tostring(data.cpuNum), elapsed, produced, remaining))
           unfinished[itemKey] = nil
         else
-          print(string.format("[DEBUG] Crafting in progress for %s (Label: %s, CPU: %s)... Started at %s, Elapsed: %d seconds, Produced: %d, Remaining: %d",
-                data.label, data.label, tostring(data.cpuNum), time_format(startTime), elapsed, produced, remaining))
+          print(string.format("[DEBUG] Crafting in progress for %s  CPU: %s ... Started at %s, Elapsed: %d seconds, Produced: %d, Remaining: %d",
+                data.label, tostring(data.cpuNum), time_format(startTime), elapsed, produced, remaining))
         end
       end
     end
