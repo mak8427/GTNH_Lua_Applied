@@ -5,21 +5,51 @@ string = require("string")
 os = require("os")
 internet = require("internet") -- For webclock functions
 
--- Real-world time functions
 function webclock()
-    local handle = internet.request("http://www.rootdir.org/webclock.php?tz=Europe/Rome&locale=pt_BR.UTF-8")
-    local result = ""
-    for chunk in handle do
-        result = chunk
+    local success, handle = pcall(internet.request, "http://www.rootdir.org/webclock.php?tz=Europe/Rome&locale=pt_BR.UTF-8")
+    if not success or not handle then
+        return nil, "Failed to connect to the time server."
     end
+
+    local result = ""
+    local ok, err = pcall(function()
+        for chunk in handle do
+            result = result .. chunk
+        end
+    end)
+
+    if not ok or result == "" then
+        return nil, "Failed to read data from the server."
+    end
+
+    -- Print or log the raw result to debug formatting issues
+    print("Raw server time string: " .. result)
+
+    -- Simple sanity check
+    if #result < 19 then
+        return nil, "Unexpected time string format: " .. result
+    end
+
+    local year = tonumber(result:sub(1, 4))
+    local month = tonumber(result:sub(6, 7))
+    local day = tonumber(result:sub(9, 10))
+    local hour = tonumber(result:sub(12, 13))
+    local min = tonumber(result:sub(15, 16))
+    local sec = tonumber(result:sub(18, 19))
+
+    if not (year and month and day and hour and min and sec) then
+        return nil, "Failed to parse date from result: " .. result
+    end
+
     local datetime = os.time({
-        year = result:sub(1, 4),
-        month = result:sub(6, 7),
-        day = result:sub(9, 10),
-        hour = result:sub(12, 13),
-        min = result:sub(15, 16),
-        sec = result:sub(18, 19)
+        year = year,
+        month = month,
+        day = day,
+        hour = hour,
+        min = min,
+        sec = sec
     })
+
     return datetime
 end
 
@@ -161,8 +191,12 @@ local function checkCrafting()
                     local recipe = ae2.getCraftables({ name = itemname, damage = damage })[1]
             if recipe then
                 print(string.format("[DEBUG] Requesting crafting of %d of %s (Label: %s)...", reqsize, itemname, label))
-                local monitor = recipe.request(reqsize)
                 local freeCPU = getFreeCPU() -- Get free CPU at the time of the request
+
+
+                local monitor = recipe.request(reqsize)
+
+
                 monitors[fullItemName] = {
                     monitor = monitor,
                     startTime = webclock(),
@@ -200,7 +234,10 @@ local function monitorCrafting(monitors)
             local startTime = data.startTime
             local totalRequested = data.totalRequested
             local initialStock = data.initialStock
+
+            print(os.date("%Y-%m-%d %H:%M:%S", os.time()))
             local elapsed = webclock() - startTime
+
 
             -- Re-query current stock for the item.
             local currentItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
