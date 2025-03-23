@@ -191,8 +191,7 @@ local function checkCrafting()
             if recipe then
                 print(string.format("[DEBUG] Requesting crafting of %d of %s (Label: %s)...", reqsize, itemname, label))
                 local freeCPU = getFreeCPU() -- Get free CPU at the time of the request
-
-
+                print(freeCPU.name)
                 local monitor = recipe.request(reqsize,false,freeCPU.name)
 
 
