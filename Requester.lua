@@ -22,12 +22,10 @@ function webclock()
         return nil, "Failed to read data from the server."
     end
 
-    -- Print or log the raw result to debug formatting issues
-    print("Raw server time string: " .. result)
-
     -- Simple sanity check
     if #result < 19 then
-        return nil, "Unexpected time string format: " .. result
+        print("Unexpected time string format: " .. result)
+        os.sleep(1)
     end
 
     local year = tonumber(result:sub(1, 4))
@@ -236,7 +234,6 @@ local function monitorCrafting(monitors)
             local totalRequested = data.totalRequested
             local initialStock = data.initialStock
 
-            print(os.date("%Y-%m-%d %H:%M:%S", os.time()))
             local elapsed = webclock() - startTime
 
 
