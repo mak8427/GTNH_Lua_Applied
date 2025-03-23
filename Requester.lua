@@ -3,8 +3,11 @@ sides = require("sides")
 component = require("component")
 string = require("string")
 os = require("os")
-internet = require("internet") -- For webclock functions
+internet = require("internet")  -- For webclock functions
 
+--------------------------------------------------
+-- Time and Date Functions
+--------------------------------------------------
 function webclock()
     local success, handle = pcall(internet.request, "http://www.rootdir.org/webclock.php?tz=Europe/Rome&locale=pt_BR.UTF-8")
     if not success or not handle then
@@ -22,7 +25,6 @@ function webclock()
         return nil, "Failed to read data from the server."
     end
 
-    -- Simple sanity check
     if #result < 19 then
         print("Unexpected time string format: " .. result)
         os.sleep(1)
@@ -37,7 +39,7 @@ function webclock()
 
     if not (year and month and day and hour and min and sec) then
        os.sleep(1)
-       webclock()
+       return webclock()
     end
 
     local datetime = os.time({
@@ -56,8 +58,9 @@ function time_format(datetime)
     return os.date("%Y-%m-%d %H:%M:%S", datetime)
 end
 
----------------------------------------------------------------------
--- Read CSV file and parse watchlist
+--------------------------------------------------
+-- CSV and Watchlist Functions
+--------------------------------------------------
 local function readCSVFile(filename)
     local file = io.open(filename, "r")
     if not file then
@@ -82,12 +85,12 @@ local function parseWatchItems(csv)
     return items
 end
 
--- Read watchlist from file "watchlist.csv"
 local csvContent = readCSVFile("watchlist.csv")
 local watchitems = parseWatchItems(csvContent)
----------------------------------------------------------------------
 
--- Get AE2 component
+--------------------------------------------------
+-- AE2 Component Setup and Logging
+--------------------------------------------------
 print("[DEBUG] Checking AE2 component availability...")
 local ae2
 if component.isAvailable("me_controller") then
@@ -101,7 +104,6 @@ else
     os.exit()
 end
 
--- Logging system: Save current AE2 network items to a file.
 local function logNetworkItems()
     local logFile = "ae2_item_log.txt"
     local file = io.open(logFile, "w")
@@ -129,7 +131,10 @@ local function logNetworkItems()
     print("[DEBUG] Item list saved to " .. logFile)
 end
 
--- Utility: Parse full item string into (name, damage)
+--------------------------------------------------
+-- Utility Functions
+--------------------------------------------------
+-- Parse full item string into (name, damage)
 local function parseItemName(fullName)
     local pos = string.find(fullName, "/")
     if pos then
@@ -141,7 +146,7 @@ local function parseItemName(fullName)
     end
 end
 
--- Helper: Return the index of the first free CPU
+-- Return the first free CPU from AE2
 local function getFreeCPU()
     local cpus = ae2.getCpus()
     for i, cpu in ipairs(cpus) do
@@ -150,146 +155,119 @@ local function getFreeCPU()
             return cpu
         end
     end
-    return "N/A"
+    return nil
 end
 
--- Function to trigger crafting requests for items that are short in stock.
+--------------------------------------------------
+-- Crafting Request Functions
+--------------------------------------------------
+-- Check for missing items and submit crafting requests.
 -- Only one active request per item is allowed.
-local function checkCrafting()
-    local monitors = {}
+local function checkAndSubmitCrafting(monitors)
     for fullItemName, data in pairs(watchitems) do
-        local desiredCount = data.desired
-        local batchSize = data.batch
-        print("\n----------------------------------------")
-        print(string.format("[DEBUG] Checking item: %s | Desired count: %d | Batch size: %d", fullItemName, desiredCount,
-            batchSize))
+        -- Only create a new request if not already monitoring this item.
+        if not monitors[fullItemName] then
+            local desiredCount = data.desired
+            local batchSize = data.batch
+            local itemname, damage = parseItemName(fullItemName)
 
-        local itemname, damage = parseItemName(fullItemName)
-        print(string.format("[DEBUG] Parsed item: %s | Metadata: %s", itemname, tostring(damage)))
-
-        print("[DEBUG] Querying AE2 network for item...")
-        local item_in_network = ae2.getItemsInNetwork({ name = itemname, damage = damage })[1]
-
-        local currentStock = 0
-        local label = fullItemName
-        if item_in_network then
-            currentStock = item_in_network.size
-            if item_in_network.label then
-                label = item_in_network.label
-            end
-            print(string.format("[DEBUG] Current stock: %d (Label: %s)", currentStock, label))
-        else
-            print("[DEBUG] Item not found in network. Assuming 0 in stock.")
-        end
-
-        if desiredCount > currentStock then
-            local difference = desiredCount - currentStock
-            local reqsize = math.min(difference, batchSize)
-            print(string.format("[DEBUG] Need to craft %d more (difference: %d) of %s (Label: %s)", reqsize, difference,
-                itemname, label))
-                    local recipe = ae2.getCraftables({ name = itemname, damage = damage })[1]
-            if recipe then
-                print(string.format("[DEBUG] Requesting crafting of %d of %s (Label: %s)...", reqsize, itemname, label))
-                local freeCPU = getFreeCPU() -- Get free CPU at the time of the request
-                print(freeCPU.name)
-                local monitor = recipe.request(reqsize,false,freeCPU.name)
-
-
-                monitors[fullItemName] = {
-                    monitor = monitor,
-                    startTime = webclock(),
-                    totalRequested = reqsize,
-                    initialStock = currentStock,
-                    queryName = itemname,
-                    queryDamage = damage,
-                    label = label,
-                    cpuNum = freeCPU.name
-                }
-                print(string.format("[DEBUG] Craft initiated at %s on CPU %s for %s",
-                    time_format(monitors[fullItemName].startTime), tostring(freeCPU), label))
-            else
-                print(string.format("[ERROR] No recipe found for %s/%s", itemname, tostring(damage)))
-            end
-        else
-            print(string.format("[DEBUG] Stock sufficient: %d / %d", currentStock, desiredCount))
-        end
-
-        os.sleep(0.1) -- Short delay between requests
-    end
-    return monitors
-end
-
--- Function to monitor crafting requests concurrently.
-local function monitorCrafting(monitors)
-    local unfinished = {}
-    for key, _ in pairs(monitors) do
-        unfinished[key] = true
-    end
-
-    while next(unfinished) do
-        for itemKey, data in pairs(monitors) do
-            local monitor = data.monitor
-            local startTime = data.startTime
-            local totalRequested = data.totalRequested
-            local initialStock = data.initialStock
-
-            local elapsed = webclock() - startTime
-
-
-            -- Re-query current stock for the item.
-            local currentItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
-            local currentStock = currentItem and currentItem.size or 0
-            local produced = currentStock - initialStock
-            if produced < 0 then produced = 0 end
-            local remaining = totalRequested - produced
-            if remaining < 0 then remaining = 0 end
-
-            if unfinished[itemKey] then
-                if monitor.isCanceled() then
-                    print(string.format("[WARNING] Crafting of %s CPU: %s was canceled after %d seconds.",
-                        data.label, tostring(data.cpuNum), elapsed))
-                    unfinished[itemKey] = nil
-                elseif monitor.isDone() then
-                    print(string.format(
-                        "[DEBUG] Crafting of %s  CPU: %s completed successfully after %d seconds! Produced: %d, Remaining: %d",
-                        data.label, tostring(data.cpuNum), elapsed, produced, remaining))
-                    unfinished[itemKey] = nil
-                else
-                    print(string.format(
-                        "[DEBUG] Crafting in progress for %s  CPU: %s ... Started at %s, Elapsed: %d seconds, Produced: %d, Remaining: %d",
-                        data.label, tostring(data.cpuNum), time_format(startTime), elapsed, produced, remaining))
+            local item_in_network = ae2.getItemsInNetwork({ name = itemname, damage = damage })[1]
+            local currentStock = 0
+            local label = fullItemName
+            if item_in_network then
+                currentStock = item_in_network.size
+                if item_in_network.label then
+                    label = item_in_network.label
                 end
+            else
+                print("[DEBUG] Item not found in network. Assuming 0 in stock.")
             end
+
+            if desiredCount > currentStock then
+                local difference = desiredCount - currentStock
+                local reqsize = math.min(difference, batchSize)
+                print(string.format("[DEBUG] Need to craft %d more (difference: %d) of %s", reqsize, difference, label))
+                local recipe = ae2.getCraftables({ name = itemname, damage = damage })[1]
+                if recipe then
+                    local freeCPU = getFreeCPU()
+                    if freeCPU then
+                        print(string.format("[DEBUG] Requesting crafting of %d of %s on CPU %s...", reqsize, label, freeCPU.name))
+                        local monitor = recipe.request(reqsize, false, freeCPU.name)
+                        monitors[fullItemName] = {
+                            monitor = monitor,
+                            startTime = webclock(),
+                            totalRequested = reqsize,
+                            initialStock = currentStock,
+                            queryName = itemname,
+                            queryDamage = damage,
+                            label = label,
+                            cpuNum = freeCPU.name
+                        }
+                    else
+                        print("[WARNING] No free CPU available for crafting request.")
+                    end
+                else
+                    print(string.format("[ERROR] No recipe found for %s/%s", itemname, tostring(damage)))
+                end
+            else
+                print(string.format("[DEBUG] Stock sufficient: %d / %d for %s", currentStock, desiredCount, label))
+            end
+            os.sleep(0.1) -- Short delay between requests
         end
-        os.sleep(5)
     end
 end
 
--- Main loop function
+-- Update the status of current crafting requests.
+local function updateMonitors(monitors)
+    for itemKey, data in pairs(monitors) do
+        local monitor = data.monitor
+        local elapsed = webclock() - data.startTime
+
+        -- Re-query current stock for the item.
+        local currentItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
+        local currentStock = currentItem and currentItem.size or 0
+        local produced = currentStock - data.initialStock
+        if produced < 0 then produced = 0 end
+        local remaining = data.totalRequested - produced
+        if remaining < 0 then remaining = 0 end
+
+        if monitor.isCanceled() then
+            print(string.format("[WARNING] Crafting of %s on CPU %s was canceled after %d seconds.", data.label, tostring(data.cpuNum), elapsed))
+            monitors[itemKey] = nil
+        elseif monitor.isDone() then
+            print(string.format("[DEBUG] Crafting of %s on CPU %s completed after %d seconds! Produced: %d, Remaining: %d", data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+            monitors[itemKey] = nil
+        else
+            print(string.format("[DEBUG] Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d", data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+        end
+    end
+end
+
+--------------------------------------------------
+-- Main Loop
+--------------------------------------------------
 local function mainLoop()
+    local monitors = {} -- Global table to hold active crafting requests
+
     while true do
         print("\n[DEBUG] Starting new loop cycle...")
-        -- Check redstone signal (stubbed)
-        local rs_input = 100
+        local rs_input = 100  -- Stubbed redstone signal
         print(string.format("[DEBUG] Redstone input is %d", rs_input))
-
-        -- Check CPU usage using getFreeCPU()
-        local currentFreeCPU = getFreeCPU()
-        if rs_input > 0 and currentFreeCPU ~= "N/A" then
-            print("[DEBUG] System is idle and ready for crafting check.")
-            local monitors = checkCrafting()
-            monitorCrafting(monitors)
+        if rs_input > 0 then
+            -- Submit new crafting requests if needed.
+            checkAndSubmitCrafting(monitors)
+            -- Update status of all active crafting requests.
+            updateMonitors(monitors)
         else
-            print("[DEBUG] Skipping crafting check. Either redstone signal is off or no free CPUs available.")
+            print("[DEBUG] Skipping crafting check. Redstone signal is off.")
         end
 
-        -- Wait before starting the next cycle
-        os.sleep(30)
+        os.sleep(5)  -- Delay before starting the next cycle.
     end
 end
 
--- Log the network items once before starting the main loop
-logNetworkItems()
-
--- Start the main loop
-mainLoop()
+--------------------------------------------------
+-- Initialization and Start
+--------------------------------------------------
+logNetworkItems()  -- Log the network items once before starting the main loop.
+mainLoop()         -- Start the main loop.
