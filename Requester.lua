@@ -149,7 +149,7 @@ local function getFreeCPU()
     for i, cpu in ipairs(cpus) do
         print(string.format("CPU #%d - Name: %s - Busy: %s", i, cpu.name or "Unnamed", tostring(cpu.busy)))
         if not cpu.busy then
-            return i
+            return cpu
         end
     end
     return "N/A"
@@ -195,7 +195,7 @@ local function checkCrafting()
                 local freeCPU = getFreeCPU() -- Get free CPU at the time of the request
 
 
-                local monitor = recipe.request(reqsize)
+                local monitor = recipe.request(reqsize,false,freeCPU.name)
 
 
                 monitors[fullItemName] = {
@@ -206,7 +206,7 @@ local function checkCrafting()
                     queryName = itemname,
                     queryDamage = damage,
                     label = label,
-                    cpuNum = freeCPU
+                    cpuNum = freeCPU.name
                 }
                 print(string.format("[DEBUG] Craft initiated at %s on CPU %s for %s",
                     time_format(monitors[fullItemName].startTime), tostring(freeCPU), label))
