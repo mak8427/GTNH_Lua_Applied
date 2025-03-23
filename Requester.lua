@@ -38,7 +38,8 @@ function webclock()
     local sec = tonumber(result:sub(18, 19))
 
     if not (year and month and day and hour and min and sec) then
-        return nil, "Failed to parse date from result: " .. result
+       os.sleep(1)
+       webclock()
     end
 
     local datetime = os.time({
