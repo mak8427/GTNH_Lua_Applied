@@ -3,8 +3,8 @@ sides = require("sides")
 component = require("component")
 string = require("string")
 os = require("os")
-internet = require("internet")  -- For webclock functions
-gpu = component.gpu  -- Get GPU component for colored text
+internet = require("internet") -- For webclock functions
+gpu = component.gpu            -- Get GPU component for colored text
 
 -- Color constants
 local COLOR_WHITE = 0xFFFFFF
@@ -54,7 +54,8 @@ end
 -- Time and Date Functions
 --------------------------------------------------
 function webclock()
-    local success, handle = pcall(internet.request, "http://www.rootdir.org/webclock.php?tz=Europe/Rome&locale=pt_BR.UTF-8")
+    local success, handle = pcall(internet.request,
+        "http://www.rootdir.org/webclock.php?tz=Europe/Rome&locale=pt_BR.UTF-8")
     if not success or not handle then
         return nil, "Failed to connect to the time server."
     end
@@ -83,8 +84,8 @@ function webclock()
     local sec = tonumber(result:sub(18, 19))
 
     if not (year and month and day and hour and min and sec) then
-       os.sleep(1)
-       return webclock()
+        os.sleep(1)
+        return webclock()
     end
 
     local datetime = os.time({
@@ -195,9 +196,6 @@ end
 local function getFreeCPU()
     local cpus = ae2.getCpus()
     for i, cpu in ipairs(cpus) do
-        gpu.setForeground(COLOR_MAGENTA)
-        print(string.format("CPU #%d - Name: %s - Busy: %s", i, cpu.name or "Unnamed", tostring(cpu.busy)))
-        gpu.setForeground(COLOR_WHITE)
         if not cpu.busy then
             return cpu
         end
@@ -238,7 +236,8 @@ local function checkAndSubmitCrafting(monitors)
                 if recipe then
                     local freeCPU = getFreeCPU()
                     if freeCPU then
-                        print_info(string.format("Requesting crafting of %d of %s on CPU %s...", reqsize, label, freeCPU.name))
+                        print_info(string.format("Requesting crafting of %d of %s on CPU %s...", reqsize, label,
+                            freeCPU.name))
                         local monitor = recipe.request(reqsize, false, freeCPU.name)
                         monitors[fullItemName] = {
                             monitor = monitor,
@@ -279,14 +278,16 @@ local function updateMonitors(monitors)
         if remaining < 0 then remaining = 0 end
 
         if monitor.isCanceled() then
-            print_warning(string.format("Crafting of %s on CPU %s was canceled after %d seconds.", data.label, tostring(data.cpuNum), elapsed))
+            print_warning(string.format("Crafting of %s on CPU %s was canceled after %d seconds.", data.label,
+                tostring(data.cpuNum), elapsed))
             monitors[itemKey] = nil
         elseif monitor.isDone() then
             print_info(string.format("Crafting of %s on CPU %s completed after %d seconds! Produced: %d, Remaining: %d",
                 data.label, tostring(data.cpuNum), elapsed, produced, remaining))
             monitors[itemKey] = nil
         else
-            print_status(string.format("Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d",
+            print_status(string.format(
+                "Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d",
                 data.label, tostring(data.cpuNum), elapsed, produced, remaining))
         end
     end
@@ -305,7 +306,7 @@ local function mainLoop()
         print(string.rep("=", 50))
         gpu.setForeground(COLOR_WHITE)
 
-        local rs_input = 100  -- Stubbed redstone signal
+        local rs_input = 100 -- Stubbed redstone signal
         print_debug(string.format("Redstone input is %d", rs_input))
         if rs_input > 0 then
             -- Submit new crafting requests if needed.
@@ -316,7 +317,7 @@ local function mainLoop()
             print_debug("Skipping crafting check. Redstone signal is off.")
         end
 
-        os.sleep(5)  -- Delay before starting the next cycle.
+        os.sleep(5) -- Delay before starting the next cycle.
     end
 end
 
@@ -330,6 +331,6 @@ print("    " .. time_format(webclock()))
 print(string.rep("*", 50))
 gpu.setForeground(COLOR_WHITE)
 
-logNetworkItems()  -- Log the network items once before starting the main loop.
+logNetworkItems() -- Log the network items once before starting the main loop.
 print_info("Starting main monitoring loop...")
-mainLoop()         -- Start the main loop.
+mainLoop()        -- Start the main loop.
