@@ -4,6 +4,51 @@ component = require("component")
 string = require("string")
 os = require("os")
 internet = require("internet")  -- For webclock functions
+gpu = component.gpu  -- Get GPU component for colored text
+
+-- Color constants
+local COLOR_WHITE = 0xFFFFFF
+local COLOR_GREEN = 0x00FF00
+local COLOR_BLUE = 0x2E86C1
+local COLOR_YELLOW = 0xFFFF00
+local COLOR_RED = 0xFF0000
+local COLOR_CYAN = 0x00FFFF
+local COLOR_MAGENTA = 0xFF00FF
+
+-- Set default colors
+gpu.setForeground(COLOR_WHITE)
+gpu.setBackground(0x000000)
+
+-- Colored print functions
+local function print_debug(text)
+    gpu.setForeground(COLOR_BLUE)
+    print("[DEBUG] " .. text)
+    gpu.setForeground(COLOR_WHITE)
+end
+
+local function print_info(text)
+    gpu.setForeground(COLOR_GREEN)
+    print("[INFO] " .. text)
+    gpu.setForeground(COLOR_WHITE)
+end
+
+local function print_warning(text)
+    gpu.setForeground(COLOR_YELLOW)
+    print("[WARNING] " .. text)
+    gpu.setForeground(COLOR_WHITE)
+end
+
+local function print_error(text)
+    gpu.setForeground(COLOR_RED)
+    print("[ERROR] " .. text)
+    gpu.setForeground(COLOR_WHITE)
+end
+
+local function print_status(text)
+    gpu.setForeground(COLOR_CYAN)
+    print("[STATUS] " .. text)
+    gpu.setForeground(COLOR_WHITE)
+end
 
 --------------------------------------------------
 -- Time and Date Functions
@@ -26,7 +71,7 @@ function webclock()
     end
 
     if #result < 19 then
-        print("Unexpected time string format: " .. result)
+        print_warning("Unexpected time string format: " .. result)
         os.sleep(1)
     end
 
@@ -64,7 +109,7 @@ end
 local function readCSVFile(filename)
     local file = io.open(filename, "r")
     if not file then
-        print("[ERROR] Could not open file " .. filename)
+        print_error("Could not open file " .. filename)
         os.exit()
     end
     local content = file:read("*a")
@@ -91,16 +136,16 @@ local watchitems = parseWatchItems(csvContent)
 --------------------------------------------------
 -- AE2 Component Setup and Logging
 --------------------------------------------------
-print("[DEBUG] Checking AE2 component availability...")
+print_debug("Checking AE2 component availability...")
 local ae2
 if component.isAvailable("me_controller") then
     ae2 = component.me_controller
-    print("[DEBUG] Connected to ME Controller.")
+    print_info("Connected to ME Controller.")
 elseif component.isAvailable("me_interface") then
     ae2 = component.me_interface
-    print("[DEBUG] Connected to ME Interface.")
+    print_info("Connected to ME Interface.")
 else
-    print("[ERROR] No ME controller or interface found. Exiting.")
+    print_error("No ME controller or interface found. Exiting.")
     os.exit()
 end
 
@@ -108,7 +153,7 @@ local function logNetworkItems()
     local logFile = "ae2_item_log.txt"
     local file = io.open(logFile, "w")
     if not file then
-        print("[ERROR] Failed to open log file for writing.")
+        print_error("Failed to open log file for writing.")
         return
     end
 
@@ -118,7 +163,7 @@ local function logNetworkItems()
     local items = ae2.getItemsInNetwork()
     if #items == 0 then
         file:write("[ERROR] No items found in AE2 Network.\n")
-        print("[ERROR] No items found in AE2 Network.")
+        print_error("No items found in AE2 Network.")
     else
         for _, item in ipairs(items) do
             local line = string.format("%s/%d - %d in stock\n", item.name, item.damage, item.size)
@@ -128,7 +173,7 @@ local function logNetworkItems()
 
     file:write("---------------------------------\n")
     file:close()
-    print("[DEBUG] Item list saved to " .. logFile)
+    print_info("Item list saved to " .. logFile)
 end
 
 --------------------------------------------------
@@ -150,7 +195,9 @@ end
 local function getFreeCPU()
     local cpus = ae2.getCpus()
     for i, cpu in ipairs(cpus) do
+        gpu.setForeground(COLOR_MAGENTA)
         print(string.format("CPU #%d - Name: %s - Busy: %s", i, cpu.name or "Unnamed", tostring(cpu.busy)))
+        gpu.setForeground(COLOR_WHITE)
         if not cpu.busy then
             return cpu
         end
@@ -180,18 +227,18 @@ local function checkAndSubmitCrafting(monitors)
                     label = item_in_network.label
                 end
             else
-                print("[DEBUG] Item not found in network. Assuming 0 in stock.")
+                print_debug("Item not found in network. Assuming 0 in stock.")
             end
 
             if desiredCount > currentStock then
                 local difference = desiredCount - currentStock
                 local reqsize = math.min(difference, batchSize)
-                print(string.format("[DEBUG] Need to craft %d more (difference: %d) of %s", reqsize, difference, label))
+                print_debug(string.format("Need to craft %d more (difference: %d) of %s", reqsize, difference, label))
                 local recipe = ae2.getCraftables({ name = itemname, damage = damage })[1]
                 if recipe then
                     local freeCPU = getFreeCPU()
                     if freeCPU then
-                        print(string.format("[DEBUG] Requesting crafting of %d of %s on CPU %s...", reqsize, label, freeCPU.name))
+                        print_info(string.format("Requesting crafting of %d of %s on CPU %s...", reqsize, label, freeCPU.name))
                         local monitor = recipe.request(reqsize, false, freeCPU.name)
                         monitors[fullItemName] = {
                             monitor = monitor,
@@ -204,13 +251,13 @@ local function checkAndSubmitCrafting(monitors)
                             cpuNum = freeCPU.name
                         }
                     else
-                        print("[WARNING] No free CPU available for crafting request.")
+                        print_warning("No free CPU available for crafting request.")
                     end
                 else
-                    print(string.format("[ERROR] No recipe found for %s/%s", itemname, tostring(damage)))
+                    print_error(string.format("No recipe found for %s/%s", itemname, tostring(damage)))
                 end
             else
-                print(string.format("[DEBUG] Stock sufficient: %d / %d for %s", currentStock, desiredCount, label))
+                print_status(string.format("Stock sufficient: %d / %d for %s", currentStock, desiredCount, label))
             end
             os.sleep(0.1) -- Short delay between requests
         end
@@ -232,13 +279,15 @@ local function updateMonitors(monitors)
         if remaining < 0 then remaining = 0 end
 
         if monitor.isCanceled() then
-            print(string.format("[WARNING] Crafting of %s on CPU %s was canceled after %d seconds.", data.label, tostring(data.cpuNum), elapsed))
+            print_warning(string.format("Crafting of %s on CPU %s was canceled after %d seconds.", data.label, tostring(data.cpuNum), elapsed))
             monitors[itemKey] = nil
         elseif monitor.isDone() then
-            print(string.format("[DEBUG] Crafting of %s on CPU %s completed after %d seconds! Produced: %d, Remaining: %d", data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+            print_info(string.format("Crafting of %s on CPU %s completed after %d seconds! Produced: %d, Remaining: %d",
+                data.label, tostring(data.cpuNum), elapsed, produced, remaining))
             monitors[itemKey] = nil
         else
-            print(string.format("[DEBUG] Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d", data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+            print_status(string.format("Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d",
+                data.label, tostring(data.cpuNum), elapsed, produced, remaining))
         end
     end
 end
@@ -250,16 +299,21 @@ local function mainLoop()
     local monitors = {} -- Global table to hold active crafting requests
 
     while true do
-        print("\n[DEBUG] Starting new loop cycle...")
+        gpu.setForeground(COLOR_GREEN)
+        print("\n" .. string.rep("=", 50))
+        print_info("Starting new loop cycle at " .. time_format(webclock()))
+        print(string.rep("=", 50))
+        gpu.setForeground(COLOR_WHITE)
+
         local rs_input = 100  -- Stubbed redstone signal
-        print(string.format("[DEBUG] Redstone input is %d", rs_input))
+        print_debug(string.format("Redstone input is %d", rs_input))
         if rs_input > 0 then
             -- Submit new crafting requests if needed.
             checkAndSubmitCrafting(monitors)
             -- Update status of all active crafting requests.
             updateMonitors(monitors)
         else
-            print("[DEBUG] Skipping crafting check. Redstone signal is off.")
+            print_debug("Skipping crafting check. Redstone signal is off.")
         end
 
         os.sleep(5)  -- Delay before starting the next cycle.
@@ -269,5 +323,13 @@ end
 --------------------------------------------------
 -- Initialization and Start
 --------------------------------------------------
+gpu.setForeground(COLOR_CYAN)
+print(string.rep("*", 50))
+print("    AE2 AUTO-CRAFTER SYSTEM")
+print("    " .. time_format(webclock()))
+print(string.rep("*", 50))
+gpu.setForeground(COLOR_WHITE)
+
 logNetworkItems()  -- Log the network items once before starting the main loop.
+print_info("Starting main monitoring loop...")
 mainLoop()         -- Start the main loop.
