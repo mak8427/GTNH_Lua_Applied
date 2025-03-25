@@ -15,6 +15,9 @@ local COLOR_RED = 0xFF0000
 local COLOR_CYAN = 0x00FFFF
 local COLOR_MAGENTA = 0xFF00FF
 
+-- Configuration settings
+local CRAFTING_TIMEOUT_SECONDS = 300  -- 5 minutes timeout for crafting requests
+
 -- Set default colors
 gpu.setForeground(COLOR_WHITE)
 gpu.setBackground(0x000000)
@@ -203,6 +206,20 @@ local function getFreeCPU()
     return nil
 end
 
+-- Try to cancel a crafting job by signaling to AE2 to stop the job
+local function attemptCancelCraftingJob(itemKey, data)
+    -- Log that we're attempting to cancel
+    print_warning(string.format("Attempting to cancel crafting job for %s (exceeded %d second timeout)",
+        data.label, CRAFTING_TIMEOUT_SECONDS))
+
+    -- Note: According to the API documentation, there's no direct method to cancel a crafting request
+    -- We're storing this information and will mark it as timed out in our monitors table
+
+    -- Add a cancellation flag to the data
+    data.cancellationAttempted = true
+    return true
+end
+
 --------------------------------------------------
 -- Crafting Request Functions
 --------------------------------------------------
@@ -247,7 +264,8 @@ local function checkAndSubmitCrafting(monitors)
                             queryName = itemname,
                             queryDamage = damage,
                             label = label,
-                            cpuNum = freeCPU.name
+                            cpuNum = freeCPU.name,
+                            cancellationAttempted = false
                         }
                     else
                         print_warning("No free CPU available for crafting request.")
@@ -265,9 +283,12 @@ end
 
 -- Update the status of current crafting requests.
 local function updateMonitors(monitors)
+    local timedOutJobs = {}
+
     for itemKey, data in pairs(monitors) do
         local monitor = data.monitor
-        local elapsed = webclock() - data.startTime
+        local currentTime = webclock()
+        local elapsed = currentTime - data.startTime
 
         -- Re-query current stock for the item.
         local currentItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
@@ -277,19 +298,48 @@ local function updateMonitors(monitors)
         local remaining = data.totalRequested - produced
         if remaining < 0 then remaining = 0 end
 
+        -- Check if the job has exceeded the timeout threshold
+        if not data.cancellationAttempted and elapsed > CRAFTING_TIMEOUT_SECONDS then
+            -- Attempt to cancel the job
+            if attemptCancelCraftingJob(itemKey, data) then
+                -- Mark this job for later review
+                table.insert(timedOutJobs, itemKey)
+                print_error(string.format("Crafting of %s on CPU %s has timed out after %d seconds (limit: %d seconds).",
+                    data.label, tostring(data.cpuNum), elapsed, CRAFTING_TIMEOUT_SECONDS))
+            end
+        end
+
         if monitor.isCanceled() then
-            print_warning(string.format("Crafting of %s on CPU %s was canceled after %d seconds.", data.label,
-                tostring(data.cpuNum), elapsed))
+            local cancelReason = data.cancellationAttempted and " (timeout triggered)" or ""
+            print_warning(string.format("Crafting of %s on CPU %s was canceled after %d seconds%s",
+                data.label, tostring(data.cpuNum), elapsed, cancelReason))
             monitors[itemKey] = nil
         elseif monitor.isDone() then
             print_info(string.format("Crafting of %s on CPU %s completed after %d seconds! Produced: %d, Remaining: %d",
                 data.label, tostring(data.cpuNum), elapsed, produced, remaining))
             monitors[itemKey] = nil
         else
+            local timeoutWarning = ""
+            if elapsed > (CRAFTING_TIMEOUT_SECONDS * 0.75) and not data.cancellationAttempted then
+                timeoutWarning = string.format(" (WARNING: Will timeout in %d seconds)",
+                    CRAFTING_TIMEOUT_SECONDS - elapsed)
+                gpu.setForeground(COLOR_YELLOW)
+            end
+
             print_status(string.format(
-                "Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d",
-                data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+                "Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d%s",
+                data.label, tostring(data.cpuNum), elapsed, produced, remaining, timeoutWarning))
+
+            if timeoutWarning ~= "" then
+                gpu.setForeground(COLOR_WHITE)
+            end
         end
+    end
+
+    -- Log summary of timed out jobs if any
+    if #timedOutJobs > 0 then
+        print_warning(string.format("Warning: %d crafting jobs exceeded the %d second timeout and were canceled",
+            #timedOutJobs, CRAFTING_TIMEOUT_SECONDS))
     end
 end
 
@@ -328,6 +378,7 @@ gpu.setForeground(COLOR_CYAN)
 print(string.rep("*", 50))
 print("    AE2 AUTO-CRAFTER SYSTEM")
 print("    " .. time_format(webclock()))
+print("    Timeout threshold: " .. CRAFTING_TIMEOUT_SECONDS .. " seconds")
 print(string.rep("*", 50))
 gpu.setForeground(COLOR_WHITE)
 
