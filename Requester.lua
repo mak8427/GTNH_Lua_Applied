@@ -22,6 +22,9 @@ local CRAFTING_TIMEOUT_SECONDS = 3000 -- 50 minutes timeout for crafting request
 gpu.setForeground(COLOR_WHITE)
 gpu.setBackground(0x000000)
 
+-- Initialize crafting history tracking
+local craftingHistory = {}
+
 -- Colored print functions
 local function print_debug(text)
     gpu.setForeground(COLOR_BLUE)
@@ -134,8 +137,12 @@ local function parseWatchItems(csv)
     return items
 end
 
+local csvContent = readCSVFile("watchlist.csv")
+local watchitems = parseWatchItems(csvContent)
 
-
+--------------------------------------------------
+-- CSV Export Functions
+--------------------------------------------------
 -- Function to export active monitors to CSV
 local function exportActiveMonitorsToCSV(monitors)
     local filename = "active_monitors.csv"
@@ -150,8 +157,10 @@ local function exportActiveMonitorsToCSV(monitors)
     file:write("InitialStock,CurrentStock,Produced,Remaining,CPUName,CancellationAttempted\n")
 
     local currentTime = webclock()
+    local monitorCount = 0
 
     for itemKey, data in pairs(monitors) do
+        monitorCount = monitorCount + 1
         local elapsed = currentTime - data.startTime
 
         -- Re-query current stock for the item
@@ -182,53 +191,8 @@ local function exportActiveMonitorsToCSV(monitors)
     end
 
     file:close()
-    print_info("Exported " .. table.getn(monitors) .. " active monitors to " .. filename)
+    print_info("Exported " .. monitorCount .. " active monitors to " .. filename)
     return true
-end
-
-
-
-
-
--- Initialize history tracking table
-local craftingHistory = {}
-
--- Function to add completed or canceled job to history
-local function addToHistory(itemKey, data, status, endTime)
-    local historyEntry = {
-        itemKey = itemKey,
-        label = data.label,
-        queryName = data.queryName,
-        queryDamage = data.queryDamage,
-        startTime = data.startTime,
-        endTime = endTime or webclock(),
-        totalRequested = data.totalRequested,
-        initialStock = data.initialStock,
-        cpuNum = data.cpuNum,
-        status = status, -- "completed" or "canceled"
-        cancellationAttempted = data.cancellationAttempted,
-        timeoutTriggered = (data.cancellationAttempted == true)
-    }
-
-    -- Calculate final metrics
-    historyEntry.duration = historyEntry.endTime - historyEntry.startTime
-
-    -- Get final stock amount
-    local finalItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
-    historyEntry.finalStock = finalItem and finalItem.size or 0
-    historyEntry.produced = math.max(0, historyEntry.finalStock - data.initialStock)
-    historyEntry.remaining = math.max(0, data.totalRequested - historyEntry.produced)
-
-    -- Add to history table
-    table.insert(craftingHistory, historyEntry)
-
-    -- Keep history at a reasonable size (e.g., last 1000 entries)
-    if #craftingHistory > 1000 then
-        table.remove(craftingHistory, 1)
-    end
-
-    -- Export history to CSV after each update
-    exportCraftingHistoryToCSV()
 end
 
 -- Function to export crafting history to CSV
@@ -271,13 +235,47 @@ local function exportCraftingHistoryToCSV()
     end
 
     file:close()
+    print_info("Exported " .. #craftingHistory .. " history entries to " .. filename)
     return true
 end
 
+-- Function to add completed or canceled job to history
+local function addToHistory(itemKey, data, status, endTime)
+    local historyEntry = {
+        itemKey = itemKey,
+        label = data.label,
+        queryName = data.queryName,
+        queryDamage = data.queryDamage,
+        startTime = data.startTime,
+        endTime = endTime or webclock(),
+        totalRequested = data.totalRequested,
+        initialStock = data.initialStock,
+        cpuNum = data.cpuNum,
+        status = status, -- "completed" or "canceled"
+        cancellationAttempted = data.cancellationAttempted,
+        timeoutTriggered = (data.cancellationAttempted == true)
+    }
 
+    -- Calculate final metrics
+    historyEntry.duration = historyEntry.endTime - historyEntry.startTime
 
-local csvContent = readCSVFile("watchlist.csv")
-local watchitems = parseWatchItems(csvContent)
+    -- Get final stock amount
+    local finalItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
+    historyEntry.finalStock = finalItem and finalItem.size or 0
+    historyEntry.produced = math.max(0, historyEntry.finalStock - data.initialStock)
+    historyEntry.remaining = math.max(0, data.totalRequested - historyEntry.produced)
+
+    -- Add to history table
+    table.insert(craftingHistory, historyEntry)
+
+    -- Keep history at a reasonable size (e.g., last 1000 entries)
+    if #craftingHistory > 1000 then
+        table.remove(craftingHistory, 1)
+    end
+
+    -- Export history to CSV after each update
+    exportCraftingHistoryToCSV()
+end
 
 --------------------------------------------------
 -- AE2 Component Setup and Logging
@@ -424,7 +422,6 @@ local function checkAndSubmitCrafting(monitors)
 end
 
 -- Update the status of current crafting requests.
--- Update the status of current crafting requests.
 local function updateMonitors(monitors)
     local timedOutJobs = {}
 
@@ -535,8 +532,12 @@ print(string.rep("*", 50))
 print("    AE2 AUTO-CRAFTER SYSTEM")
 print("    " .. time_format(webclock()))
 print("    Timeout threshold: " .. CRAFTING_TIMEOUT_SECONDS .. " seconds")
+print("    CSV Export: ENABLED (active_monitors.csv, crafting_history.csv)")
 print(string.rep("*", 50))
 gpu.setForeground(COLOR_WHITE)
+
+-- Create empty CSV files on startup
+exportCraftingHistoryToCSV()
 
 logNetworkItems() -- Log the network items once before starting the main loop.
 print_info("Starting main monitoring loop...")
