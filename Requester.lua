@@ -134,6 +134,148 @@ local function parseWatchItems(csv)
     return items
 end
 
+
+
+-- Function to export active monitors to CSV
+local function exportActiveMonitorsToCSV(monitors)
+    local filename = "active_monitors.csv"
+    local file = io.open(filename, "w")
+    if not file then
+        print_error("Failed to open " .. filename .. " for writing")
+        return false
+    end
+
+    -- Write CSV header
+    file:write("ItemKey,Label,QueryName,QueryDamage,StartTime,CurrentTime,ElapsedSeconds,TotalRequested,")
+    file:write("InitialStock,CurrentStock,Produced,Remaining,CPUName,CancellationAttempted\n")
+
+    local currentTime = webclock()
+
+    for itemKey, data in pairs(monitors) do
+        local elapsed = currentTime - data.startTime
+
+        -- Re-query current stock for the item
+        local currentItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
+        local currentStock = currentItem and currentItem.size or 0
+        local produced = math.max(0, currentStock - data.initialStock)
+        local remaining = math.max(0, data.totalRequested - produced)
+
+        -- Format CSV line (escape commas in text fields)
+        local line = string.format('"%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s",%s\n',
+            itemKey:gsub('"', '""'),                    -- ItemKey
+            data.label:gsub('"', '""'),                 -- Label
+            data.queryName:gsub('"', '""'),             -- QueryName
+            data.queryDamage,                           -- QueryDamage
+            time_format(data.startTime),                -- StartTime
+            time_format(currentTime),                   -- CurrentTime
+            elapsed,                                    -- ElapsedSeconds
+            data.totalRequested,                        -- TotalRequested
+            data.initialStock,                          -- InitialStock
+            currentStock,                               -- CurrentStock
+            produced,                                   -- Produced
+            remaining,                                  -- Remaining
+            tostring(data.cpuNum):gsub('"', '""'),     -- CPUName
+            data.cancellationAttempted and "true" or "false" -- CancellationAttempted
+        )
+
+        file:write(line)
+    end
+
+    file:close()
+    print_info("Exported " .. table.getn(monitors) .. " active monitors to " .. filename)
+    return true
+end
+
+
+
+
+
+-- Initialize history tracking table
+local craftingHistory = {}
+
+-- Function to add completed or canceled job to history
+local function addToHistory(itemKey, data, status, endTime)
+    local historyEntry = {
+        itemKey = itemKey,
+        label = data.label,
+        queryName = data.queryName,
+        queryDamage = data.queryDamage,
+        startTime = data.startTime,
+        endTime = endTime or webclock(),
+        totalRequested = data.totalRequested,
+        initialStock = data.initialStock,
+        cpuNum = data.cpuNum,
+        status = status, -- "completed" or "canceled"
+        cancellationAttempted = data.cancellationAttempted,
+        timeoutTriggered = (data.cancellationAttempted == true)
+    }
+
+    -- Calculate final metrics
+    historyEntry.duration = historyEntry.endTime - historyEntry.startTime
+
+    -- Get final stock amount
+    local finalItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
+    historyEntry.finalStock = finalItem and finalItem.size or 0
+    historyEntry.produced = math.max(0, historyEntry.finalStock - data.initialStock)
+    historyEntry.remaining = math.max(0, data.totalRequested - historyEntry.produced)
+
+    -- Add to history table
+    table.insert(craftingHistory, historyEntry)
+
+    -- Keep history at a reasonable size (e.g., last 1000 entries)
+    if #craftingHistory > 1000 then
+        table.remove(craftingHistory, 1)
+    end
+
+    -- Export history to CSV after each update
+    exportCraftingHistoryToCSV()
+end
+
+-- Function to export crafting history to CSV
+local function exportCraftingHistoryToCSV()
+    local filename = "crafting_history.csv"
+    local file = io.open(filename, "w")
+    if not file then
+        print_error("Failed to open " .. filename .. " for writing")
+        return false
+    end
+
+    -- Write CSV header
+    file:write("Timestamp,ItemKey,Label,QueryName,QueryDamage,StartTime,EndTime,DurationSeconds,")
+    file:write("TotalRequested,InitialStock,FinalStock,Produced,Remaining,CPUName,")
+    file:write("Status,CancellationAttempted,TimeoutTriggered\n")
+
+    for _, entry in ipairs(craftingHistory) do
+        -- Format CSV line (escape commas in text fields)
+        local line = string.format('"%s","%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s","%s",%s,%s\n',
+            time_format(webclock()),                    -- Timestamp of export
+            entry.itemKey:gsub('"', '""'),             -- ItemKey
+            entry.label:gsub('"', '""'),               -- Label
+            entry.queryName:gsub('"', '""'),           -- QueryName
+            entry.queryDamage,                         -- QueryDamage
+            time_format(entry.startTime),              -- StartTime
+            time_format(entry.endTime),                -- EndTime
+            entry.duration,                            -- DurationSeconds
+            entry.totalRequested,                      -- TotalRequested
+            entry.initialStock,                        -- InitialStock
+            entry.finalStock,                          -- FinalStock
+            entry.produced,                            -- Produced
+            entry.remaining,                           -- Remaining
+            tostring(entry.cpuNum):gsub('"', '""'),   -- CPUName
+            entry.status,                              -- Status (completed/canceled)
+            entry.cancellationAttempted and "true" or "false", -- CancellationAttempted
+            entry.timeoutTriggered and "true" or "false"       -- TimeoutTriggered
+        )
+
+        file:write(line)
+    end
+
+    file:close()
+    return true
+end
+
+
+
 local csvContent = readCSVFile("watchlist.csv")
 local watchitems = parseWatchItems(csvContent)
 
@@ -282,10 +424,15 @@ local function checkAndSubmitCrafting(monitors)
 end
 
 -- Update the status of current crafting requests.
+-- Update the status of current crafting requests.
 local function updateMonitors(monitors)
     local timedOutJobs = {}
 
-     print(string.rep("=", 50))
+    print(string.rep("=", 50))
+
+    -- Export active monitors to CSV at the beginning of update
+    exportActiveMonitorsToCSV(monitors)
+
     for itemKey, data in pairs(monitors) do
         local monitor = data.monitor
         local currentTime = webclock()
@@ -314,10 +461,18 @@ local function updateMonitors(monitors)
             local cancelReason = data.cancellationAttempted and " (timeout triggered)" or ""
             print_warning(string.format("Crafting of %s on CPU %s was canceled after %d seconds%s",
                 data.label, tostring(data.cpuNum), elapsed, cancelReason))
+
+            -- Add to history
+            addToHistory(itemKey, data, "canceled", currentTime)
+
             monitors[itemKey] = nil
         elseif monitor.isDone() then
             print_info(string.format("Crafting of %s on CPU %s completed after %d seconds! Produced: %d, Remaining: %d",
                 data.label, tostring(data.cpuNum), elapsed, produced, remaining))
+
+            -- Add to history
+            addToHistory(itemKey, data, "completed", currentTime)
+
             monitors[itemKey] = nil
         else
             local timeoutWarning = ""
