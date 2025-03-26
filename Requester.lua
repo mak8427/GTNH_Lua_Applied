@@ -16,7 +16,7 @@ local COLOR_CYAN = 0x00FFFF
 local COLOR_MAGENTA = 0xFF00FF
 
 -- Configuration settings
-local CRAFTING_TIMEOUT_SECONDS = 3000  -- 50 minutes timeout for crafting requests
+local CRAFTING_TIMEOUT_SECONDS = 3000 -- 50 minutes timeout for crafting requests
 
 -- Set default colors
 gpu.setForeground(COLOR_WHITE)
