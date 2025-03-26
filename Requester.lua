@@ -6,6 +6,18 @@ os = require("os")
 internet = require("internet") -- For webclock functions
 gpu = component.gpu            -- Get GPU component for colored text
 
+print_debug("Checking AE2 component availability...")
+local ae2
+if component.isAvailable("me_controller") then
+    ae2 = component.me_controller
+    print_info("Connected to ME Controller.")
+elseif component.isAvailable("me_interface") then
+    ae2 = component.me_interface
+    print_info("Connected to ME Interface.")
+else
+    print_error("No ME controller or interface found. Exiting.")
+    os.exit()
+end
 -- Color constants
 local COLOR_WHITE = 0xFFFFFF
 local COLOR_GREEN = 0x00FF00
@@ -280,18 +292,7 @@ end
 --------------------------------------------------
 -- AE2 Component Setup and Logging
 --------------------------------------------------
-print_debug("Checking AE2 component availability...")
-local ae2
-if component.isAvailable("me_controller") then
-    ae2 = component.me_controller
-    print_info("Connected to ME Controller.")
-elseif component.isAvailable("me_interface") then
-    ae2 = component.me_interface
-    print_info("Connected to ME Interface.")
-else
-    print_error("No ME controller or interface found. Exiting.")
-    os.exit()
-end
+
 
 local function logNetworkItems()
     local logFile = "ae2_item_log.txt"
