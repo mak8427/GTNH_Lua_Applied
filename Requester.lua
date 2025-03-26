@@ -285,6 +285,7 @@ end
 local function updateMonitors(monitors)
     local timedOutJobs = {}
 
+     print(string.rep("=", 50))
     for itemKey, data in pairs(monitors) do
         local monitor = data.monitor
         local currentTime = webclock()
