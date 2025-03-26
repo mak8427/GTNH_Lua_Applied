@@ -6,18 +6,6 @@ os = require("os")
 internet = require("internet") -- For webclock functions
 gpu = component.gpu            -- Get GPU component for colored text
 
-print_debug("Checking AE2 component availability...")
-local ae2
-if component.isAvailable("me_controller") then
-    ae2 = component.me_controller
-    print_info("Connected to ME Controller.")
-elseif component.isAvailable("me_interface") then
-    ae2 = component.me_interface
-    print_info("Connected to ME Interface.")
-else
-    print_error("No ME controller or interface found. Exiting.")
-    os.exit()
-end
 -- Color constants
 local COLOR_WHITE = 0xFFFFFF
 local COLOR_GREEN = 0x00FF00
@@ -151,6 +139,49 @@ end
 
 local csvContent = readCSVFile("watchlist.csv")
 local watchitems = parseWatchItems(csvContent)
+
+--------------------------------------------------
+-- AE2 Component Setup and Logging
+--------------------------------------------------
+print_debug("Checking AE2 component availability...")
+local ae2
+if component.isAvailable("me_controller") then
+    ae2 = component.me_controller
+    print_info("Connected to ME Controller.")
+elseif component.isAvailable("me_interface") then
+    ae2 = component.me_interface
+    print_info("Connected to ME Interface.")
+else
+    print_error("No ME controller or interface found. Exiting.")
+    os.exit()
+end
+
+local function logNetworkItems()
+    local logFile = "ae2_item_log.txt"
+    local file = io.open(logFile, "w")
+    if not file then
+        print_error("Failed to open log file for writing.")
+        return
+    end
+
+    file:write("AE2 Network Item List:\n")
+    file:write("---------------------------------\n")
+
+    local items = ae2.getItemsInNetwork()
+    if #items == 0 then
+        file:write("[ERROR] No items found in AE2 Network.\n")
+        print_error("No items found in AE2 Network.")
+    else
+        for _, item in ipairs(items) do
+            local line = string.format("%s/%d - %d in stock\n", item.name, item.damage, item.size)
+            file:write(line)
+        end
+    end
+
+    file:write("---------------------------------\n")
+    file:close()
+    print_info("Item list saved to " .. logFile)
+end
 
 --------------------------------------------------
 -- CSV Export Functions
@@ -287,38 +318,6 @@ local function addToHistory(itemKey, data, status, endTime)
 
     -- Export history to CSV after each update
     exportCraftingHistoryToCSV()
-end
-
---------------------------------------------------
--- AE2 Component Setup and Logging
---------------------------------------------------
-
-
-local function logNetworkItems()
-    local logFile = "ae2_item_log.txt"
-    local file = io.open(logFile, "w")
-    if not file then
-        print_error("Failed to open log file for writing.")
-        return
-    end
-
-    file:write("AE2 Network Item List:\n")
-    file:write("---------------------------------\n")
-
-    local items = ae2.getItemsInNetwork()
-    if #items == 0 then
-        file:write("[ERROR] No items found in AE2 Network.\n")
-        print_error("No items found in AE2 Network.")
-    else
-        for _, item in ipairs(items) do
-            local line = string.format("%s/%d - %d in stock\n", item.name, item.damage, item.size)
-            file:write(line)
-        end
-    end
-
-    file:write("---------------------------------\n")
-    file:close()
-    print_info("Item list saved to " .. logFile)
 end
 
 --------------------------------------------------
