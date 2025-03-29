@@ -312,9 +312,9 @@ local function addToHistory(itemKey, data, status, endTime)
     table.insert(craftingHistory, historyEntry)
 
     -- Keep history at a reasonable size (e.g., last 1000 entries)
-    if #craftingHistory > 1000 then
-        table.remove(craftingHistory, 1)
-    end
+    -- if #craftingHistory > 1000 then
+        -- table.remove(craftingHistory, 1)
+    -- end
 
     -- Export history to CSV after each update
     exportCraftingHistoryToCSV()
