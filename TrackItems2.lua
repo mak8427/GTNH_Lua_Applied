@@ -89,14 +89,16 @@ repeat
 
     print("Getting Items! "..time_format(datetime))
 
+
+    -- Remove the lock file
+    os.remove("file.lock")
+
     -- Wait 5 minutes for another update
     sleep(300)
 
     datetime = datetime + 300
     check_time = check_time + 1
 
-    -- Remove the lock file
-    os.remove("file.lock")
 
 until 1 > 5
 file:close()
