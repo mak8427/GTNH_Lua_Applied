@@ -69,7 +69,8 @@ local file = io.open("Export.csv", "a")
 repeat
     -- Wait for the lock file to be available
     while io.open("file.lock", "r") do
-        sleep(0.1)
+        sleep(1)
+        print("Waiting for File lock")
     end
 
     -- Create the lock file
