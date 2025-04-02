@@ -1,5 +1,6 @@
 local internet = require("internet")
 local component = require("component")
+local filesystem = require("filesystem")
 
 local me
 if component.isAvailable("me_controller") then
@@ -61,45 +62,71 @@ function sleep(n)
     os.execute("sleep " .. tonumber(n))
 end
 
-check_time = 1
+function acquireLock(lockFile, maxAttempts)
+    local attempts = 0
+    while attempts < maxAttempts do
+        -- Try to create the lock file exclusively
+        local file, err = io.open(lockFile, "wx")
+        if file then
+            -- Lock acquired successfully
+            file:close()
+            return true
+        end
 
+        -- If file exists, wait and retry
+        sleep(1)
+        attempts = attempts + 1
+        print("Waiting for File lock, attempt " .. attempts .. "/" .. maxAttempts)
+    end
+
+    print("Failed to acquire lock after " .. maxAttempts .. " attempts")
+    return false
+end
+
+function releaseLock(lockFile)
+    local success, err = os.remove(lockFile)
+    if not success then
+        print("Warning: Failed to remove lock file: " .. (err or "unknown error"))
+    end
+end
+
+check_time = 1
 datetime = webclock()
 local file = io.open("Export.csv", "a")
+local lockFile = "file.lock"
 
 repeat
-    -- Wait for the lock file to be available
-    while io.open("file.lock", "r") do
-        sleep(1)
-        print("Waiting for File lock")
+    -- Try to acquire the lock
+    if acquireLock(lockFile, 10) then
+        local success, err = pcall(function()
+            if check_time >= 5 then
+                print("Updating Web Time")
+                datetime = webclock()
+                check_time = 1
+            end
+
+            local items = AE_get_items(datetime)
+            file:write(items)
+            file:flush()
+
+            print("Getting Items! " .. time_format(datetime))
+        end)
+
+        -- Always release the lock, even if an error occurred
+        releaseLock(lockFile)
+
+        if not success then
+            print("Error occurred: " .. tostring(err))
+        end
+    else
+        print("Skipping this iteration due to lock acquisition failure")
     end
-
-    -- Create the lock file
-    local lock = io.open("file.lock", "w")
-    lock:close()
-
-    if check_time >= 5 then
-        print("Updating Web Time")
-        datetime = webclock()
-        check_time = 1
-    end
-
-    local items = AE_get_items(datetime)
-
-    file:write(items)
-    file:flush()
-
-    print("Getting Items! "..time_format(datetime))
-
-
-    -- Remove the lock file
-    os.remove("file.lock")
 
     -- Wait 5 minutes for another update
     sleep(300)
 
     datetime = datetime + 300
     check_time = check_time + 1
-
 
 until 1 > 5
 file:close()
