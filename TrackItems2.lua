@@ -65,18 +65,38 @@ end
 function acquireLock(lockFile, maxAttempts)
     local attempts = 0
     while attempts < maxAttempts do
-        -- Try to create the lock file exclusively
-        local file, err = io.open(lockFile, "wx")
-        if file then
-            -- Lock acquired successfully
-            file:close()
-            return true
+        -- Check if the lock file exists
+        if not filesystem.exists(lockFile) then
+            -- Try to create the lock file
+            local file = io.open(lockFile, "w")
+            if file then
+                -- Write a timestamp and process info to the lock file
+                file:write(os.date("%Y-%m-%d %H:%M:%S"))
+                file:close()
+                return true
+            end
         end
 
-        -- If file exists, wait and retry
+        -- If we're here, either the file exists or we couldn't create it
+        -- Check if the lock is stale (optional, if you have access to process info)
+        if filesystem.exists(lockFile) then
+            local info = filesystem.lastModified(lockFile)
+            -- If lock is older than 10 minutes, assume it's stale and remove it
+            if info and os.time() - info > 600 then
+                print("Removing stale lock file")
+                filesystem.remove(lockFile)
+                -- Don't increment attempts, try again immediately
+                sleep(0.5)
+                goto continue
+            end
+        end
+
+        -- Wait and retry
         sleep(1)
         attempts = attempts + 1
         print("Waiting for File lock, attempt " .. attempts .. "/" .. maxAttempts)
+
+        ::continue::
     end
 
     print("Failed to acquire lock after " .. maxAttempts .. " attempts")
@@ -84,9 +104,11 @@ function acquireLock(lockFile, maxAttempts)
 end
 
 function releaseLock(lockFile)
-    local success, err = os.remove(lockFile)
-    if not success then
-        print("Warning: Failed to remove lock file: " .. (err or "unknown error"))
+    if filesystem.exists(lockFile) then
+        local success, err = filesystem.remove(lockFile)
+        if not success then
+            print("Warning: Failed to remove lock file: " .. (err or "unknown error"))
+        end
     end
 end
 
