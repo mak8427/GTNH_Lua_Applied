@@ -12,6 +12,33 @@ else
     os.exit()
 end
 
+
+---
+--- Locking
+---
+
+function file_exists(name)
+   local f=io.open(name,"r")
+   if f~=nil then io.close(f) return true else return false end
+end
+
+
+function lock_start()
+    local lock = "file.lock"
+    if file_exists(lock) == false then
+        local file = io.open(lock, "w")
+        file.close()
+        return false
+    end
+    return true
+end
+
+
+function lock_end()
+    local lock = "/file.lock"
+    os.remove(lock)
+end
+
 -- Function to get Real World time
 function webclock()
 
@@ -75,10 +102,9 @@ end
 check_time = 1
 
 datetime = webclock()
-local file = io.open("Export.csv", "a")
 
 repeat
-
+    local file = io.open("Export.csv", "a")
     -- Update the internal timer with the Webclock time after some runs
 	if check_time >= 5 then
 		print("Updating Web Time")
@@ -86,16 +112,20 @@ repeat
 		check_time = 1
 	end
 
+    local done = false
+    while done == false do
+        if lock_start() then
+	        local items = AE_get_items(datetime)
+
+	        file:write(items)
+            file:flush()
 
 
-	local items = AE_get_items(datetime)
-
-	file:write(items)
-    file:flush()
-
-
-
-	print("Getting Items! "..time_format(datetime))
+	        print("Getting Items! "..time_format(datetime))
+	        done = true
+	    end
+    end
+    lock_end()
 
     -- Wait 5 minutes for another update
 	sleep(300)
@@ -103,6 +133,6 @@ repeat
 	datetime = datetime + 300
 
 	check_time = check_time + 1
+	file:close()
 
 until 1 > 5
-file:close()
