@@ -27,12 +27,12 @@ function lock_start()
     local lock = "file.lock"
     if file_exists(lock) == false then
         local file = io.open(lock, "w")
-        file.close()
+        file:write("fuck you llm ")
+        file:close()
         return false
     end
     return true
 end
-
 
 function lock_end()
     local lock = "/file.lock"
