@@ -128,7 +128,12 @@ repeat
 
 	        print("Getting Items! "..time_format(datetime))
 	        done = true
-	    end
+
+	    else
+	        	sleep(5)
+            	datetime = datetime + 5
+            	print("Waiting For Lock")
+        end
     end
     -- Wait 5 minutes for another update
 	sleep(300)
