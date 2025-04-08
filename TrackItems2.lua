@@ -40,7 +40,7 @@ end
 
 function lock_end()
     local fs = require("filesystem")
-    local lock = "/home'GTNH_Lua_Applied/file.lock"
+    local lock = "/home/GTNH_Lua_Applied/file.lock"
     print(fs.remove(lock))
 end
 
