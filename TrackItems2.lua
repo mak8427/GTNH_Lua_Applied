@@ -1,6 +1,6 @@
 local internet = require("internet")
 local component = require("component")
-
+local fs = require("filesystem")
 
 local me
 if component.isAvailable("me_controller") then
@@ -40,7 +40,7 @@ end
 
 function lock_end()
     local lock = "file.lock"
-    os.remove(lock)
+    fs.remove(lock)
 end
 
 
@@ -135,8 +135,8 @@ repeat
             	print("Waiting For Lock")
         end
     end
-    	file:close()
-    	lock_end()
+    file:close()
+    lock_end()
     -- Wait 5 minutes for another update
 	sleep(300)
 
