@@ -18,10 +18,14 @@ end
 ---
 
 function file_exists(name)
-   local f=io.open(name,"r")
-   if f~=nil then io.close(f) return true else return false end
+   local f = io.open(name, "r")
+   if f ~= nil then
+      f:close()
+      return true
+   else
+      return false
+   end
 end
-
 
 function lock_start()
     local lock = "file.lock"
@@ -35,9 +39,10 @@ function lock_start()
 end
 
 function lock_end()
-    local lock = "/file.lock"
+    local lock = "file.lock"
     os.remove(lock)
 end
+
 
 -- Function to get Real World time
 function webclock()
@@ -114,7 +119,7 @@ repeat
 
     local done = false
     while done == false do
-        if lock_start() then
+        if lock_start() == false then
 	        local items = AE_get_items(datetime)
 
 	        file:write(items)
@@ -125,8 +130,6 @@ repeat
 	        done = true
 	    end
     end
-    lock_end()
-
     -- Wait 5 minutes for another update
 	sleep(300)
 
@@ -134,5 +137,7 @@ repeat
 
 	check_time = check_time + 1
 	file:close()
+	lock_end()
+
 
 until 1 > 5
