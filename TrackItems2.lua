@@ -39,6 +39,7 @@ function lock_start()
 end
 
 function lock_end()
+    local fs = require("filesystem")
     local lock = "file.lock"
     fs.remove(lock)
 end
