@@ -135,14 +135,15 @@ repeat
             	print("Waiting For Lock")
         end
     end
+    	file:close()
+    	lock_end()
     -- Wait 5 minutes for another update
 	sleep(300)
 
 	datetime = datetime + 300
 
 	check_time = check_time + 1
-	file:close()
-	lock_end()
+
 
 
 until 1 > 5
