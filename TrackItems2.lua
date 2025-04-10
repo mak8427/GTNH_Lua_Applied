@@ -1,6 +1,6 @@
 local internet = require("internet")
 local component = require("component")
-
+local fs = require("filesystem")
 
 local me
 if component.isAvailable("me_controller") then
@@ -11,6 +11,39 @@ else
     print("You need to connect the adapter to either a me controller or a me interface")
     os.exit()
 end
+
+
+---
+--- Locking
+---
+
+function file_exists(name)
+   local f = io.open(name, "r")
+   if f ~= nil then
+      f:close()
+      return true
+   else
+      return false
+   end
+end
+
+function lock_start()
+    local lock = "file.lock"
+    if file_exists(lock) == false then
+        local file = io.open(lock, "w")
+        file:write("fuck you llm ")
+        file:close()
+        return false
+    end
+    return true
+end
+
+function lock_end()
+    local fs = require("filesystem")
+    local lock = "/home/GTNH_Lua_Applied/file.lock"
+    print(fs.remove(lock))
+end
+
 
 -- Function to get Real World time
 function webclock()
@@ -75,10 +108,9 @@ end
 check_time = 1
 
 datetime = webclock()
-local file = io.open("Export.csv", "a")
 
 repeat
-
+    local file = io.open("Export.csv", "a")
     -- Update the internal timer with the Webclock time after some runs
 	if check_time >= 5 then
 		print("Updating Web Time")
@@ -86,17 +118,26 @@ repeat
 		check_time = 1
 	end
 
+    local done = false
+    while done == false do
+        if lock_start() == false then
+	        local items = AE_get_items(datetime)
+
+	        file:write(items)
+            file:flush()
 
 
-	local items = AE_get_items(datetime)
+	        print("Getting Items! "..time_format(datetime))
+	        done = true
 
-	file:write(items)
-    file:flush()
-
-
-
-	print("Getting Items! "..time_format(datetime))
-
+	    else
+	        	sleep(5)
+            	datetime = datetime + 5
+            	print("Waiting For Lock")
+        end
+    end
+    file:close()
+    lock_end()
     -- Wait 5 minutes for another update
 	sleep(300)
 
@@ -104,5 +145,6 @@ repeat
 
 	check_time = check_time + 1
 
+
+
 until 1 > 5
-file:close()
