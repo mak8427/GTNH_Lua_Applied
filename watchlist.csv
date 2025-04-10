@@ -45,11 +45,14 @@ dreamcraft:item.MoonStoneDust,5120,512
 gregtech:gt.metaitem.01/11081,50000,256
 gregtech:gt.metaitem.01/11316,50000,100
 gregtech:gt.metaitem.01/11084,10000,100
-gregtech:gt.blockmachines/2880,100000,100
 gregtech:gt.metaitem.01/32604,512,10
 gregtech:gt.metaitem.01/32614,512,10
 gregtech:gt.metaitem.01/32634,512,10
 gregtech:gt.metaitem.01/32644,512,10
 gregtech:gt.metaitem.01/32654,512,10
 gregtech:gt.metaitem.01/2819,10000,128
+gregtech:gt.metaitem.01/2052,10000,128
+bartworks:gt.bwMetaGenerateddust/78,10000,64
+gregtech:gt.metaitem.01/2817,10000,128
+
 
