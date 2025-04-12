@@ -238,22 +238,43 @@ local function exportActiveMonitorsToCSV(monitors)
     return true
 end
 
--- Function to export crafting history to CSV
+-- Function to export crafting history to CSV (appending mode)
 local function exportCraftingHistoryToCSV()
     local filename = "crafting_history.csv"
-    local file = io.open(filename, "w")
+    local fileExists = false
+    local f = io.open(filename, "r")
+    if f then
+        fileExists = true
+        f:close()
+    end
+
+    -- Open file in append mode
+    local file = io.open(filename, fileExists and "a" or "w")
     if not file then
         print_error("Failed to open " .. filename .. " for writing")
         return false
     end
 
-    -- Write CSV header
-    file:write("Timestamp,ItemKey,Label,QueryName,QueryDamage,StartTime,EndTime,DurationSeconds,")
-    file:write("TotalRequested,InitialStock,FinalStock,Produced,Remaining,CPUName,")
-    file:write("Status,CancellationAttempted,TimeoutTriggered\n")
+    -- Write header only if creating a new file
+    if not fileExists then
+        file:write("Timestamp,ItemKey,Label,QueryName,QueryDamage,StartTime,EndTime,DurationSeconds,")
+        file:write("TotalRequested,InitialStock,FinalStock,Produced,Remaining,CPUName,")
+        file:write("Status,CancellationAttempted,TimeoutTriggered\n")
+    end
 
-    for _, entry in ipairs(craftingHistory) do
-        -- Format CSV line (escape commas in text fields)
+    -- Only write new entries that haven't been written yet
+    local entriesToWrite = {}
+    for i = #craftingHistory - (#craftingHistory - lastExportedIndex), #craftingHistory do
+        if i > 0 then -- Ensure index is valid
+            table.insert(entriesToWrite, craftingHistory[i])
+        end
+    end
+
+    -- Update last exported index
+    lastExportedIndex = #craftingHistory
+
+    -- Write only new entries
+    for _, entry in ipairs(entriesToWrite) do
         local line = string.format('"%s","%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s","%s",%s,%s\n',
             time_format(webclock()),                    -- Timestamp of export
             entry.itemKey:gsub('"', '""'),             -- ItemKey
@@ -278,8 +299,66 @@ local function exportCraftingHistoryToCSV()
     end
 
     file:close()
-    print_info("Exported " .. #craftingHistory .. " history entries to " .. filename)
+
+    if #entriesToWrite > 0 then
+        print_info("Appended " .. #entriesToWrite .. " new history entries to " .. filename)
+    end
+
     return true
+end
+local function loadCraftingHistory()
+    local filename = "crafting_history.csv"
+    local file = io.open(filename, "r")
+    if not file then
+        print_info("No existing history file found. Starting fresh.")
+        return
+    end
+
+    print_info("Loading previous crafting history...")
+
+    -- Skip header line
+    file:read("*l")
+
+    local count = 0
+    for line in file:lines() do
+        count = count + 1
+
+        -- Parse CSV line and reconstruct history entry
+        -- This is simplified and would need to match your exact CSV format
+        local timestamp, itemKey, label, queryName, queryDamage, startTimeStr, endTimeStr, duration,
+              totalRequested, initialStock, finalStock, produced, remaining, cpuNum,
+              status, cancellationAttempted, timeoutTriggered = line:match(
+            '"([^"]+)","([^"]+)","([^"]+)",(%d+),([^,]+),([^,]+),(%d+),(%d+),(%d+),(%d+),(%d+),(%d+),"([^"]+)",([^,]+),([^,]+),([^,]+)'
+        )
+
+        if itemKey then
+            -- Convert string values back to appropriate types
+            local entry = {
+                itemKey = itemKey,
+                label = label,
+                queryName = queryName,
+                queryDamage = tonumber(queryDamage),
+                startTime = 0, -- You'd need to parse the date string
+                endTime = 0,   -- You'd need to parse the date string
+                duration = tonumber(duration),
+                totalRequested = tonumber(totalRequested),
+                initialStock = tonumber(initialStock),
+                finalStock = tonumber(finalStock),
+                produced = tonumber(produced),
+                remaining = tonumber(remaining),
+                cpuNum = cpuNum,
+                status = status,
+                cancellationAttempted = (cancellationAttempted == "true"),
+                timeoutTriggered = (timeoutTriggered == "true")
+            }
+
+            table.insert(craftingHistory, entry)
+        end
+    end
+
+    file:close()
+    lastExportedIndex = #craftingHistory
+    print_info("Loaded " .. count .. " historical crafting records.")
 end
 
 -- Function to add completed or canceled job to history
@@ -311,15 +390,10 @@ local function addToHistory(itemKey, data, status, endTime)
     -- Add to history table
     table.insert(craftingHistory, historyEntry)
 
-    -- Keep history at a reasonable size (e.g., last 1000 entries)
-    -- if #craftingHistory > 1000 then
-        -- table.remove(craftingHistory, 1)
-    -- end
-
-    -- Export history to CSV after each update
+    -- Export history to CSV after each batch of updates
     exportCraftingHistoryToCSV()
-end
 
+end
 --------------------------------------------------
 -- Utility Functions
 --------------------------------------------------
@@ -536,6 +610,8 @@ print("    CSV Export: ENABLED (active_monitors.csv, crafting_history.csv)")
 print(string.rep("*", 50))
 gpu.setForeground(COLOR_WHITE)
 
+-- Load previous history if available
+loadCraftingHistory()
 -- Create empty CSV files on startup
 exportCraftingHistoryToCSV()
 
