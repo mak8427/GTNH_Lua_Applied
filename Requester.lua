@@ -22,8 +22,6 @@ local CRAFTING_TIMEOUT_SECONDS = 3000 -- 50 minutes timeout for crafting request
 gpu.setForeground(COLOR_WHITE)
 gpu.setBackground(0x000000)
 
--- Initialize crafting history tracking
-local craftingHistory = {}
 
 -- Colored print functions
 local function print_debug(text)
@@ -360,40 +358,32 @@ local function loadCraftingHistory()
     lastExportedIndex = #craftingHistory
     print_info("Loaded " .. count .. " historical crafting records.")
 end
-
--- Function to add completed or canceled job to history
-local function addToHistory(itemKey, data, status, endTime)
-    local historyEntry = {
-        itemKey = itemKey,
-        label = data.label,
-        queryName = data.queryName,
-        queryDamage = data.queryDamage,
-        startTime = data.startTime,
-        endTime = endTime or webclock(),
-        totalRequested = data.totalRequested,
-        initialStock = data.initialStock,
-        cpuNum = data.cpuNum,
-        status = status, -- "completed" or "canceled"
-        cancellationAttempted = data.cancellationAttempted,
-        timeoutTriggered = (data.cancellationAttempted == true)
-    }
-
-    -- Calculate final metrics
-    historyEntry.duration = historyEntry.endTime - historyEntry.startTime
-
-    -- Get final stock amount
-    local finalItem = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
-    historyEntry.finalStock = finalItem and finalItem.size or 0
-    historyEntry.produced = math.max(0, historyEntry.finalStock - data.initialStock)
-    historyEntry.remaining = math.max(0, data.totalRequested - historyEntry.produced)
-
-    -- Add to history table
-    table.insert(craftingHistory, historyEntry)
-
-    -- Export history to CSV after each batch of updates
-    exportCraftingHistoryToCSV()
-
+-- Append one finished-job record to crafting_history.csv
+local function logCraftingResult(itemKey, data, status, endTime)
+  local fileExists = io.open("crafting_history.csv","r") ~= nil
+  local file       = io.open("crafting_history.csv","a")
+  if not file then
+    print_error("Can't write crafting_history.csv") ; return
+  end
+  if not fileExists then
+    file:write("Timestamp,ItemKey,Label,QueryName,QueryDamage,StartTime,EndTime," ..
+               "DurationSeconds,TotalRequested,InitialStock,FinalStock,Produced," ..
+               "Remaining,CPUName,Status,CancellationAttempted,TimeoutTriggered\n")
+  end
+  local finalItem  = ae2.getItemsInNetwork({name=data.queryName,damage=data.queryDamage})[1]
+  local finalStock = finalItem and finalItem.size or 0
+  local produced   = math.max(0, finalStock - data.initialStock)
+  local remaining  = math.max(0, data.totalRequested - produced)
+  local duration   = endTime - data.startTime
+  file:write(string.format('"%s","%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s","%s",%s,%s\n',
+      time_format(webclock()), itemKey, data.label, data.queryName, data.queryDamage,
+      time_format(data.startTime), time_format(endTime), duration, data.totalRequested,
+      data.initialStock, finalStock, produced, remaining, tostring(data.cpuNum),
+      status, data.cancellationAttempted and "true" or "false",
+      (status=="canceled" and "true" or "false")))
+  file:close()
 end
+
 --------------------------------------------------
 -- Utility Functions
 --------------------------------------------------
@@ -534,7 +524,7 @@ local function updateMonitors(monitors)
                 data.label, tostring(data.cpuNum), elapsed, cancelReason))
 
             -- Add to history
-            addToHistory(itemKey, data, "canceled", currentTime)
+            logCraftingResult(itemKey, data, "canceled",  currentTime)
 
             monitors[itemKey] = nil
         elseif monitor.isDone() then
@@ -542,8 +532,7 @@ local function updateMonitors(monitors)
                 data.label, tostring(data.cpuNum), elapsed, produced, remaining))
 
             -- Add to history
-            addToHistory(itemKey, data, "completed", currentTime)
-
+            logCraftingResult(itemKey, data, "completed", currentTime)
             monitors[itemKey] = nil
         else
             local timeoutWarning = ""
@@ -611,9 +600,9 @@ print(string.rep("*", 50))
 gpu.setForeground(COLOR_WHITE)
 
 -- Load previous history if available
-loadCraftingHistory()
+-- loadCraftingHistory()
 -- Create empty CSV files on startup
-exportCraftingHistoryToCSV()
+-- exportCraftingHistoryToCSV()
 
 logNetworkItems() -- Log the network items once before starting the main loop.
 print_info("Starting main monitoring loop...")
