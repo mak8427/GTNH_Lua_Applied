@@ -14,7 +14,7 @@ local COLOR_YELLOW = 0xFFFF00
 local COLOR_RED = 0xFF0000
 local COLOR_CYAN = 0x00FFFF
 local COLOR_MAGENTA = 0xFF00FF
-
+local nextMonitorId = 0
 -- Configuration settings
 local CRAFTING_TIMEOUT_SECONDS = 3000 -- 50 minutes timeout for crafting requests
 
@@ -460,17 +460,20 @@ local function checkAndSubmitCrafting(monitors)
                         print_info(string.format("Requesting crafting of %d of %s on CPU %s...", reqsize, label,
                             freeCPU.name))
                         local monitor = recipe.request(reqsize, false, freeCPU.name)
-                        monitors[fullItemName] = {
-                            monitor = monitor,
-                            startTime = webclock(),
-                            totalRequested = reqsize,
-                            initialStock = currentStock,
-                            queryName = itemname,
-                            queryDamage = damage,
-                            label = label,
-                            cpuNum = freeCPU.name,
+                        nextMonitorId = nextMonitorId + 1          -- bump the counter
+
+                        monitors[fullItemName] = {                 -- store the new monitor
+                            id              = nextMonitorId,       -- ← persistent ID
+                            monitor         = monitor,
+                            startTime       = webclock(),
+                            totalRequested  = reqsize,
+                            initialStock    = currentStock,
+                            queryName       = itemname,
+                            queryDamage     = damage,
+                            label           = label,
+                            cpuNum          = freeCPU.name,
                             cancellationAttempted = false
-                        }
+                         }
                     else
                         print_warning("No free CPU available for crafting request.")
                     end
@@ -542,9 +545,10 @@ local function updateMonitors(monitors)
                 gpu.setForeground(COLOR_YELLOW)
             end
 
-            print_status(string.format(
-                "Crafting in progress for %s on CPU %s ... Elapsed: %d seconds, Produced: %d, Remaining: %d%s",
-                data.label, tostring(data.cpuNum), elapsed, produced, remaining, timeoutWarning))
+            rint_status(string.format(
+               "[%d] Crafting %s on CPU %s … Elapsed: %d s, Produced: %d, Remaining: %d%s",
+               data.id, data.label, tostring(data.cpuNum), elapsed, produced, remaining, timeoutWarning))
+
 
             if timeoutWarning ~= "" then
                 gpu.setForeground(COLOR_WHITE)
