@@ -212,19 +212,19 @@ local function exportActiveMonitorsToCSV(monitors)
 
         -- Format CSV line (escape commas in text fields)
         local line = string.format('"%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s",%s\n',
-            itemKey:gsub('"', '""'),                    -- ItemKey
-            data.label:gsub('"', '""'),                 -- Label
-            data.queryName:gsub('"', '""'),             -- QueryName
-            data.queryDamage,                           -- QueryDamage
-            time_format(data.startTime),                -- StartTime
-            time_format(currentTime),                   -- CurrentTime
-            elapsed,                                    -- ElapsedSeconds
-            data.totalRequested,                        -- TotalRequested
-            data.initialStock,                          -- InitialStock
-            currentStock,                               -- CurrentStock
-            produced,                                   -- Produced
-            remaining,                                  -- Remaining
-            tostring(data.cpuNum):gsub('"', '""'),     -- CPUName
+            itemKey:gsub('"', '""'),                         -- ItemKey
+            data.label:gsub('"', '""'),                      -- Label
+            data.queryName:gsub('"', '""'),                  -- QueryName
+            data.queryDamage,                                -- QueryDamage
+            time_format(data.startTime),                     -- StartTime
+            time_format(currentTime),                        -- CurrentTime
+            elapsed,                                         -- ElapsedSeconds
+            data.totalRequested,                             -- TotalRequested
+            data.initialStock,                               -- InitialStock
+            currentStock,                                    -- CurrentStock
+            produced,                                        -- Produced
+            remaining,                                       -- Remaining
+            tostring(data.cpuNum):gsub('"', '""'),           -- CPUName
             data.cancellationAttempted and "true" or "false" -- CancellationAttempted
         )
 
@@ -274,21 +274,21 @@ local function exportCraftingHistoryToCSV()
     -- Write only new entries
     for _, entry in ipairs(entriesToWrite) do
         local line = string.format('"%s","%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s","%s",%s,%s\n',
-            time_format(webclock()),                    -- Timestamp of export
-            entry.itemKey:gsub('"', '""'),             -- ItemKey
-            entry.label:gsub('"', '""'),               -- Label
-            entry.queryName:gsub('"', '""'),           -- QueryName
-            entry.queryDamage,                         -- QueryDamage
-            time_format(entry.startTime),              -- StartTime
-            time_format(entry.endTime),                -- EndTime
-            entry.duration,                            -- DurationSeconds
-            entry.totalRequested,                      -- TotalRequested
-            entry.initialStock,                        -- InitialStock
-            entry.finalStock,                          -- FinalStock
-            entry.produced,                            -- Produced
-            entry.remaining,                           -- Remaining
-            tostring(entry.cpuNum):gsub('"', '""'),   -- CPUName
-            entry.status,                              -- Status (completed/canceled)
+            time_format(webclock()),                           -- Timestamp of export
+            entry.itemKey:gsub('"', '""'),                     -- ItemKey
+            entry.label:gsub('"', '""'),                       -- Label
+            entry.queryName:gsub('"', '""'),                   -- QueryName
+            entry.queryDamage,                                 -- QueryDamage
+            time_format(entry.startTime),                      -- StartTime
+            time_format(entry.endTime),                        -- EndTime
+            entry.duration,                                    -- DurationSeconds
+            entry.totalRequested,                              -- TotalRequested
+            entry.initialStock,                                -- InitialStock
+            entry.finalStock,                                  -- FinalStock
+            entry.produced,                                    -- Produced
+            entry.remaining,                                   -- Remaining
+            tostring(entry.cpuNum):gsub('"', '""'),            -- CPUName
+            entry.status,                                      -- Status (completed/canceled)
             entry.cancellationAttempted and "true" or "false", -- CancellationAttempted
             entry.timeoutTriggered and "true" or "false"       -- TimeoutTriggered
         )
@@ -324,8 +324,8 @@ local function loadCraftingHistory()
         -- Parse CSV line and reconstruct history entry
         -- This is simplified and would need to match your exact CSV format
         local timestamp, itemKey, label, queryName, queryDamage, startTimeStr, endTimeStr, duration,
-              totalRequested, initialStock, finalStock, produced, remaining, cpuNum,
-              status, cancellationAttempted, timeoutTriggered = line:match(
+        totalRequested, initialStock, finalStock, produced, remaining, cpuNum,
+        status, cancellationAttempted, timeoutTriggered = line:match(
             '"([^"]+)","([^"]+)","([^"]+)",(%d+),([^,]+),([^,]+),(%d+),(%d+),(%d+),(%d+),(%d+),(%d+),"([^"]+)",([^,]+),([^,]+),([^,]+)'
         )
 
@@ -360,28 +360,28 @@ local function loadCraftingHistory()
 end
 -- Append one finished-job record to crafting_history.csv
 local function logCraftingResult(itemKey, data, status, endTime)
-  local fileExists = io.open("crafting_history.csv","r") ~= nil
-  local file       = io.open("crafting_history.csv","a")
-  if not file then
-    print_error("Can't write crafting_history.csv") ; return
-  end
-  if not fileExists then
-    file:write("Timestamp,ItemKey,Label,QueryName,QueryDamage,StartTime,EndTime," ..
-               "DurationSeconds,TotalRequested,InitialStock,FinalStock,Produced," ..
-               "Remaining,CPUName,Status,CancellationAttempted,TimeoutTriggered\n")
-  end
-  local finalItem  = ae2.getItemsInNetwork({name=data.queryName,damage=data.queryDamage})[1]
-  local finalStock = finalItem and finalItem.size or 0
-  local produced   = math.max(0, finalStock - data.initialStock)
-  local remaining  = math.max(0, data.totalRequested - produced)
-  local duration   = endTime - data.startTime
-  file:write(string.format('"%s","%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s","%s",%s,%s\n',
-      time_format(webclock()), itemKey, data.label, data.queryName, data.queryDamage,
-      time_format(data.startTime), time_format(endTime), duration, data.totalRequested,
-      data.initialStock, finalStock, produced, remaining, tostring(data.cpuNum),
-      status, data.cancellationAttempted and "true" or "false",
-      (status=="canceled" and "true" or "false")))
-  file:close()
+    local file, err = io.open("crafting_history.csv", "a")
+    if not file then
+        print_error("io.open failed: " .. tostring(err)) -- shows permission‑denied, disk‑full, etc.
+        return
+    end
+    if not fileExists then
+        file:write("Timestamp,ItemKey,Label,QueryName,QueryDamage,StartTime,EndTime," ..
+            "DurationSeconds,TotalRequested,InitialStock,FinalStock,Produced," ..
+            "Remaining,CPUName,Status,CancellationAttempted,TimeoutTriggered\n")
+    end
+    local finalItem  = ae2.getItemsInNetwork({ name = data.queryName, damage = data.queryDamage })[1]
+    local finalStock = finalItem and finalItem.size or 0
+    local produced   = math.max(0, finalStock - data.initialStock)
+    local remaining  = math.max(0, data.totalRequested - produced)
+    local duration   = endTime - data.startTime
+    file:write(string.format('"%s","%s","%s","%s",%d,%s,%s,%d,%d,%d,%d,%d,%d,"%s","%s",%s,%s\n',
+        time_format(webclock()), itemKey, data.label, data.queryName, data.queryDamage,
+        time_format(data.startTime), time_format(endTime), duration, data.totalRequested,
+        data.initialStock, finalStock, produced, remaining, tostring(data.cpuNum),
+        status, data.cancellationAttempted and "true" or "false",
+        (status == "canceled" and "true" or "false")))
+    file:close()
 end
 
 --------------------------------------------------
@@ -460,20 +460,20 @@ local function checkAndSubmitCrafting(monitors)
                         print_info(string.format("Requesting crafting of %d of %s on CPU %s...", reqsize, label,
                             freeCPU.name))
                         local monitor = recipe.request(reqsize, false, freeCPU.name)
-                        nextMonitorId = nextMonitorId + 1          -- bump the counter
+                        nextMonitorId = nextMonitorId + 1    -- bump the counter
 
-                        monitors[fullItemName] = {                 -- store the new monitor
-                            id              = nextMonitorId,       -- ← persistent ID
-                            monitor         = monitor,
-                            startTime       = webclock(),
-                            totalRequested  = reqsize,
-                            initialStock    = currentStock,
-                            queryName       = itemname,
-                            queryDamage     = damage,
-                            label           = label,
-                            cpuNum          = freeCPU.name,
+                        monitors[fullItemName] = {           -- store the new monitor
+                            id                    = nextMonitorId, -- ← persistent ID
+                            monitor               = monitor,
+                            startTime             = webclock(),
+                            totalRequested        = reqsize,
+                            initialStock          = currentStock,
+                            queryName             = itemname,
+                            queryDamage           = damage,
+                            label                 = label,
+                            cpuNum                = freeCPU.name,
                             cancellationAttempted = false
-                         }
+                        }
                     else
                         print_warning("No free CPU available for crafting request.")
                     end
@@ -527,7 +527,7 @@ local function updateMonitors(monitors)
                 data.label, tostring(data.cpuNum), elapsed, cancelReason))
 
             -- Add to history
-            logCraftingResult(itemKey, data, "canceled",  currentTime)
+            logCraftingResult(itemKey, data, "canceled", currentTime)
 
             monitors[itemKey] = nil
         elseif monitor.isDone() then
@@ -546,8 +546,8 @@ local function updateMonitors(monitors)
             end
 
             rint_status(string.format(
-               "[%d] Crafting %s on CPU %s … Elapsed: %d s, Produced: %d, Remaining: %d%s",
-               data.id, data.label, tostring(data.cpuNum), elapsed, produced, remaining, timeoutWarning))
+                "[%d] Crafting %s on CPU %s … Elapsed: %d s, Produced: %d, Remaining: %d%s",
+                data.id, data.label, tostring(data.cpuNum), elapsed, produced, remaining, timeoutWarning))
 
 
             if timeoutWarning ~= "" then
